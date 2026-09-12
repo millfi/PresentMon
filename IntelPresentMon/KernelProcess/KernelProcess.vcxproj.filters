@@ -32,6 +32,12 @@
     <ClInclude Include="kact\Introspect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="kact\ProbeFps.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FpsProbe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="kact\KernelExecutionContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>

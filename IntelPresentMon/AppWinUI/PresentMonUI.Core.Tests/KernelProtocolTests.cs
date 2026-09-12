@@ -95,6 +95,14 @@ public static class KernelProtocolTests
             Equal(false, etl.Payload.Bool(), "ETL request");
             etl.Payload.RequireEnd();
             await server.ReplyAsync(etl);
+            var probe = await server.RequestAsync("ProbeFps");
+            Equal("123,456", string.Join(',', probe.Payload.List(probe.Payload.UInt32, 4)), "FPS probe candidates");
+            probe.Payload.RequireEnd();
+            await server.ReplyAsync(probe, writer => { writer.Write(1UL); writer.Write(456u); });
+            var releaseProbe = await server.RequestAsync("ProbeFps");
+            Equal(0, releaseProbe.Payload.List(releaseProbe.Payload.UInt32, 4).Count, "empty candidates release trackers");
+            releaseProbe.Payload.RequireEnd();
+            await server.ReplyAsync(releaseProbe, writer => writer.Write(0UL));
             await server.EventAsync("HotkeyFiredAction", writer => writer.Write(1));
             await server.EventAsync("TargetLostAction", writer => writer.Write(456u));
             await server.EventAsync("PresentmonInitFailedAction");
@@ -109,6 +117,8 @@ public static class KernelProtocolTests
         await client.BindHotkeyAsync(new() { Action = HotkeyAction.ToggleCapture, Combination = new() { Key = 42, Modifiers = [2, 4] } });
         await client.ClearHotkeyAsync(2);
         await client.SetEtlLoggingAsync(false);
+        Equal("456", string.Join(',', await client.ProbeFpsAsync([123, 456])), "FPS probe result");
+        Equal(0, (await client.ProbeFpsAsync([])).Count, "released FPS probe result");
         await worker.WaitAsync(TimeSpan.FromSeconds(5));
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));

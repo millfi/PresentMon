@@ -46,9 +46,17 @@ rejected. Connection establishment is bounded to 10 seconds and requests to
 ## Operations and events
 
 Requests are `OpenSession`, `Introspect`, `PushSpecification`, `BindHotkey`,
-`ClearHotkey`, `SetCapture` and `SetEtlLogging`. Events are `HotkeyFiredAction`,
+`ClearHotkey`, `SetCapture`, `SetEtlLogging` and `ProbeFps`. Events are `HotkeyFiredAction`,
 `TargetLostAction`, `PresentmonInitFailedAction`, `OverlayDiedAction` and
 `StalePidAction`.
+
+`ProbeFps` takes a cereal vector of `uint32` candidate PIDs and returns a vector
+of PIDs with positive finite Presented FPS and recent frame activity. The kernel
+retains candidate trackers in a separate API session between requests, removes
+trackers omitted from the next request, and releases the entire probe session
+for an empty request or a UI disconnect. New candidates may return no result
+until enough frames have arrived. The operation does not change the overlay's
+target or consume its capture frames.
 
 Hotkey action IDs are 0 toggle capture, 1 toggle overlay,
 2 cycle preset and 3 toggle ETL logging. Key codes are the project's `Key::Code`

@@ -126,10 +126,12 @@ public sealed class AppSession : IAsyncDisposable
         StateChanged?.Invoke();
     }
 
-    public async Task SelectProcessAsync(int? pid)
+    public async Task SelectProcessAsync(int? pid, Func<bool>? isCurrent = null)
     {
+        if (isCurrent is not null && !isCurrent()) return;
         if (pid == selectedPid) return;
         if (Capturing) await SetCaptureAsync(false);
+        if (isCurrent is not null && !isCurrent()) return;
         var previous = selectedPid;
         selectedPid = pid;
         targetRevision++;
@@ -377,31 +379,53 @@ public sealed class AppSession : IAsyncDisposable
 
     private async Task PollProcessesAsync()
     {
+        var lastScan = Stopwatch.GetTimestamp();
+        var probeActive = false;
         while (!lifetime.IsCancellationRequested)
         {
             try
             {
                 await Task.Delay(250, lifetime.Token);
                 if (!IsConnected) return;
-                if (Preferences.EnableAutotargetting && selectedPid is null)
+                if (Preferences.EnableAutotargetting && Stopwatch.GetElapsedTime(lastScan) >= AutomaticTargeting.Interval)
                 {
-                    var top = await WindowsServices.GetTopGpuProcessAsync(
-                        Preferences.EnableTargetBlocklist ? blocklist : null, lifetime.Token);
-                    if (top is not null && Preferences.EnableAutotargetting && selectedPid is null)
-                    {
-                        await RefreshProcessesAsync();
-                        if (Preferences.EnableAutotargetting && selectedPid is null)
-                            await SelectProcessAsync(top.Pid);
-                    }
+                    lastScan = Stopwatch.GetTimestamp();
+                    var scannedTargetRevision = targetRevision;
+                    var scannedSettingsRevision = revision;
+                    bool IsCurrent() => IsConnected && Preferences.EnableAutotargetting
+                        && targetRevision == scannedTargetRevision && revision == scannedSettingsRevision;
+                    await AutomaticTargeting.UpdateAsync(
+                        () => WindowsServices.GetGpuProcessSamplesAsync(
+                            Preferences.EnableTargetBlocklist ? blocklist : null, lifetime.Token),
+                        pids =>
+                        {
+                            probeActive = true;
+                            return kernel!.ProbeFpsAsync(pids, lifetime.Token);
+                        },
+                        IsCurrent,
+                        async pid =>
+                        {
+                            if (pid == selectedPid) return;
+                            await RefreshProcessesAsync();
+                            // The process may have exited or lost its window during the scan.
+                            if (pid is not null && !Processes.Any(p => p.Pid == pid)) return;
+                            await SelectProcessAsync(pid, IsCurrent);
+                        });
                 }
-                else if (selectedPid is int pid)
+                if (!Preferences.EnableAutotargetting && probeActive)
                 {
+                    await kernel!.ProbeFpsAsync([], lifetime.Token);
+                    probeActive = false;
+                }
+                if (selectedPid is int pid)
+                {
+                    var checkedTargetRevision = targetRevision;
                     var exists = await Task.Run(() =>
                     {
                         try { using var process = Process.GetProcessById(pid); return !process.HasExited; }
                         catch (ArgumentException) { return false; }
                     }, lifetime.Token);
-                    if (!exists) await SelectProcessAsync(null);
+                    if (!exists) await SelectProcessAsync(null, () => targetRevision == checkedTargetRevision);
                 }
             }
             catch (OperationCanceledException) { return; }

@@ -17,6 +17,8 @@ the complete build, service, and installer instructions.
   target selection, capture timers, and coordination of UI changes.
 - `Services/WindowsServices.cs`: native window/process discovery and PDH-based
   automatic GPU targeting.
+- `PresentMonUI.Core/AutomaticTargeting.cs`: periodic selection among candidates
+  with measurable FPS, with revision checks for scans superseded by user input.
 - `PresentMonUI.Core`: JSON models/migrations, specification construction,
   atomic persistence, and the binary named-pipe client.
 - `Assets/Presets`: the four built-in overlay loadouts.
@@ -26,6 +28,28 @@ The native kernel still owns overlay rendering, telemetry, frame capture, and
 global hotkeys. The managed client speaks its existing cereal binary protocol.
 The kernel build stages the presets and blocklist from this project's assets
 beside the application for runtime use and installer packaging.
+
+## Automatic targeting
+
+While enabled, automatic targeting scans approximately once per second, even
+when a target is already selected. It compares each eligible application's 3D
+GPU running-time increase over the same 100 ms interval. Candidates still use
+the visible-window and optional target-blocklist filters. The highest positive
+GPU load wins; equal loads are ordered by PID.
+
+The kernel's `ProbeFps` action maintains separate PresentMon tracking for the
+candidates. A candidate must have finite, positive Presented FPS and a Present
+timestamp within the last two seconds. FPS is queried over a one-second window
+with a 1020 ms offset to accommodate normal ETW delivery. New games can therefore
+take a few seconds to qualify. Per-process queries and recent-frame checks keep
+cached FPS from qualifying another process or an inactive target.
+
+If no candidate qualifies, the selection is cleared. Enabling automatic
+targeting clears the existing selection; disabling it keeps the current target
+and releases the probe session. Manual selections while enabled can be replaced
+on a subsequent scan. Any target change uses the usual capture-stop path, so an
+active recording ends before switching. An OFF/ON toggle, manual selection, or
+settings change during a scan invalidates that scan's result.
 
 ## Compatibility and deployment
 
@@ -64,12 +88,17 @@ dotnet build IntelPresentMon\AppWinUI\PresentMonUI.Core.Tests\PresentMonUI.Core.
 dotnet run --project IntelPresentMon\AppWinUI\PresentMonUI.Core.Tests\PresentMonUI.Core.Tests.csproj --no-build
 ```
 
-The managed suite has 25 checks covering all four built-in presets, migrations,
+The managed suite has 28 checks covering all four built-in presets, migrations,
 metric/device resolution, nested change tracking, atomic persistence, native
 launch arguments and unsupported options, framing, cancellation, error responses,
-and actual native cereal fixtures. The fixture generator and provenance are in
+actual native cereal fixtures, and automatic target selection/reselection. The
+automatic targeting checks cover unmeasurable candidates, game exit/restart,
+switching between running games, and superseded scans. The fixture generator and provenance are in
 `PresentMonUI.Core.Tests/NativeFixtures`.
 `-RunNativeTests` on the build helper additionally builds and runs the C++ suite.
+`RealtimeFpsProbeFiltersAndReacquiresTargets` in `PresentMonAPI2Tests` exercises
+FPS eligibility with real rendering, non-presenting processes, process restart,
+cached data expiry, and independent overlay tracking.
 
 ## Desktop verification on 2026-09-12
 

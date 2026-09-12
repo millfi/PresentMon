@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
+using PresentMon.UI.Core;
 
 namespace PresentMon.UI.Services;
 
@@ -36,17 +37,17 @@ public static class WindowsServices
         return Task.Run(() => EnumerateProcesses(excludedNames, cancellationToken), cancellationToken);
     }
 
-    public static Task<ProcessEntry?> GetTopGpuProcessAsync(
+    public static Task<IReadOnlyList<GpuProcessSample>> GetGpuProcessSamplesAsync(
         IReadOnlySet<string>? blocklist = null,
         CancellationToken cancellationToken = default)
     {
         var excludedNames = CopyBlocklist(blocklist);
-        return Task.Run(async () =>
+        return Task.Run<IReadOnlyList<GpuProcessSample>>(async () =>
         {
             var candidates = EnumerateProcesses(excludedNames, cancellationToken).ToDictionary(process => process.Pid);
             if (candidates.Count == 0)
             {
-                return null;
+                return [];
             }
 
             ThrowIfPdhFailed(PdhOpenQueryW(null, 0, out var query), "Opening the GPU performance query");
@@ -57,19 +58,19 @@ public static class WindowsServices
                     "Adding the GPU running-time counter");
                 if (!CollectGpuData(query))
                 {
-                    return null;
+                    return candidates.Keys.Select(pid => new GpuProcessSample(pid, 0)).ToArray();
                 }
 
-                // Match the kernel's 100 ms delta of cumulative 3D engine time.
+                // Compare the same 100 ms interval for every candidate.
                 if (!CollectGpuData(query))
                 {
-                    return null;
+                    return candidates.Keys.Select(pid => new GpuProcessSample(pid, 0)).ToArray();
                 }
                 var first = ReadGpuRunningTimes(counter, candidates, cancellationToken);
                 await Task.Delay(100, cancellationToken).ConfigureAwait(false);
                 if (!CollectGpuData(query))
                 {
-                    return null;
+                    return candidates.Keys.Select(pid => new GpuProcessSample(pid, 0)).ToArray();
                 }
                 var second = ReadGpuRunningTimes(counter, candidates, cancellationToken);
                 var totals = new Dictionary<int, double>();
@@ -87,8 +88,7 @@ public static class WindowsServices
                     }
                 }
 
-                var top = totals.OrderByDescending(entry => entry.Value).ThenBy(entry => entry.Key).FirstOrDefault();
-                return top.Value > 0 ? candidates[top.Key] : null;
+                return candidates.Keys.Select(pid => new GpuProcessSample(pid, totals.GetValueOrDefault(pid))).ToArray();
             }
             finally
             {

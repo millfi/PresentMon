@@ -212,4 +212,5 @@ Test("Atomic persistence retains corrupt originals and last valid backup", () =>
 
 passed += await KernelProtocolTests.RunAsync();
 passed += StartupOptionsTests.Run();
+passed += await AutomaticTargetingTests.RunAsync();
 Console.WriteLine($"All {passed} regression checks passed.");

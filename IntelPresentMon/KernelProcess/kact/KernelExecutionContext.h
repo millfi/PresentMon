@@ -10,6 +10,7 @@
 #include <chrono>
 #include "../../Core/source/kernel/Kernel.h"
 #include "../../Core/source/win/HotkeyListener.h"
+#include "../FpsProbe.h"
 
 namespace kproc::kact
 {
@@ -22,6 +23,7 @@ namespace kproc::kact
         std::unique_ptr<ipc::act::SymmetricActionConnector<KernelExecutionContext>> pConn;
         uint32_t remotePid = 0;
         uint32_t nextCommandToken = 0;
+        std::unique_ptr<FpsProbe> pFpsProbe;
     };
 
     struct KernelExecutionContext

@@ -267,7 +267,7 @@ public sealed partial class MainWindow : Window
                     session.Changed();
                 });
             });
-        layout.Children.Add(FormControls.Row("Automatic targeting", "Every second, select the application with measurable FPS and the highest 3D GPU load. Switching targets stops an active capture.", autoTarget));
+        layout.Children.Add(FormControls.Row("Automatic targeting", "Every second, select the highest-load application whose last 10 raw GPU Busy samples contain a change. Switching targets stops an active capture.", autoTarget));
         showOverlay = FormControls.Toggle("ShowOverlay", "Show overlay", !preferences.HideAlways, value =>
         {
             if (updating) return;

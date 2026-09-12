@@ -44,7 +44,8 @@ public static class WindowsServices
         var excludedNames = CopyBlocklist(blocklist);
         return Task.Run<IReadOnlyList<GpuProcessSample>>(async () =>
         {
-            var candidates = EnumerateProcesses(excludedNames, cancellationToken).ToDictionary(process => process.Pid);
+            var candidates = EnumerateProcesses(excludedNames, cancellationToken, includeDisplayDetails: false)
+                .ToDictionary(process => process.Pid);
             if (candidates.Count == 0)
             {
                 return [];
@@ -133,7 +134,8 @@ public static class WindowsServices
         ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         : new HashSet<string>(blocklist, StringComparer.OrdinalIgnoreCase);
 
-    private static IReadOnlyList<ProcessEntry> EnumerateProcesses(HashSet<string> blocklist, CancellationToken cancellationToken)
+    private static IReadOnlyList<ProcessEntry> EnumerateProcesses(
+        HashSet<string> blocklist, CancellationToken cancellationToken, bool includeDisplayDetails = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var snapshot = CreateToolhelp32Snapshot(0x00000002, 0);
@@ -185,10 +187,16 @@ public static class WindowsServices
         foreach (var entry in windows)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var title = new StringBuilder(Math.Max(1, GetWindowTextLengthW(entry.Value) + 1));
-            GetWindowTextW(entry.Value, title, title.Capacity);
-            results.Add(new ProcessEntry(entry.Key, processNames[entry.Key], title.ToString()));
+            var windowName = string.Empty;
+            if (includeDisplayDetails)
+            {
+                var title = new StringBuilder(Math.Max(1, GetWindowTextLengthW(entry.Value) + 1));
+                GetWindowTextW(entry.Value, title, title.Capacity);
+                windowName = title.ToString();
+            }
+            results.Add(new ProcessEntry(entry.Key, processNames[entry.Key], windowName));
         }
+        if (!includeDisplayDetails) return results;
         return results.OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ThenBy(entry => entry.Pid).ToArray();
     }
 

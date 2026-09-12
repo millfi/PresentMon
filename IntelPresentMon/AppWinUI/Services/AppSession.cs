@@ -400,7 +400,7 @@ public sealed class AppSession : IAsyncDisposable
                         pids =>
                         {
                             probeActive = true;
-                            return kernel!.ProbeFpsAsync(pids, lifetime.Token);
+                            return kernel!.ProbeGpuBusyAsync(pids, lifetime.Token);
                         },
                         IsCurrent,
                         async pid =>
@@ -414,7 +414,7 @@ public sealed class AppSession : IAsyncDisposable
                 }
                 if (!Preferences.EnableAutotargetting && probeActive)
                 {
-                    await kernel!.ProbeFpsAsync([], lifetime.Token);
+                    await kernel!.ProbeGpuBusyAsync([], lifetime.Token);
                     probeActive = false;
                 }
                 if (selectedPid is int pid)

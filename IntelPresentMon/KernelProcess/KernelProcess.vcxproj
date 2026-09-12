@@ -179,8 +179,9 @@
     <ClInclude Include="kact\BindHotkey.h" />
     <ClInclude Include="kact\ClearHotkey.h" />
     <ClInclude Include="kact\Introspect.h" />
-    <ClInclude Include="kact\ProbeFps.h" />
-    <ClInclude Include="FpsProbe.h" />
+    <ClInclude Include="kact\ProbeGpuBusy.h" />
+    <ClInclude Include="GpuBusyProbe.h" />
+    <ClInclude Include="GpuBusySampleWindow.h" />
     <ClInclude Include="kact\KernelExecutionContext.h" />
     <ClInclude Include="kact\OpenSession.h" />
     <ClInclude Include="kact\PushSpecification.h" />

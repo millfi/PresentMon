@@ -1,12 +1,12 @@
 // Copyright (C) 2026 Intel Corporation
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "GpuBusySampleWindow.h"
 #include <PresentMonAPIWrapper/Session.h>
 #include <PresentMonAPIWrapperCommon/Exception.h>
 #include <CommonUtilities/Qpc.h>
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstring>
 #include <memory>
 #include <unordered_map>
@@ -16,14 +16,18 @@
 namespace kproc
 {
     // Uses a separate API session so probing cannot stop or consume the overlay's tracking.
-    class FpsProbe
+    class GpuBusyProbe
     {
     public:
-        explicit FpsProbe(pmapi::Session session) : session_{ std::move(session) }
+        explicit GpuBusyProbe(pmapi::Session session) : session_{ std::move(session) }
         {
-            std::array elements{ PM_QUERY_ELEMENT{ .metric = PM_METRIC_PRESENT_START_QPC, .stat = PM_STAT_NONE } };
+            std::array elements{
+                PM_QUERY_ELEMENT{ .metric = PM_METRIC_PRESENT_START_QPC, .stat = PM_STAT_NONE },
+                PM_QUERY_ELEMENT{ .metric = PM_METRIC_GPU_BUSY, .stat = PM_STAT_NONE },
+            };
             frames_ = session_.RegisterFrameQuery(elements);
             timestampOffset_ = elements[0].dataOffset;
+            gpuBusyOffset_ = elements[1].dataOffset;
             frameBlobs_ = frames_.MakeBlobContainer(256);
         }
 
@@ -32,6 +36,7 @@ namespace kproc
             const std::unordered_set<uint32_t> wanted{ pids.begin(), pids.end() };
             std::erase_if(entries_, [&](const auto& entry) { return !wanted.contains(entry.first); });
             std::vector<uint32_t> eligible;
+            const auto maxAge = 2 * pmon::util::GetTimestampFrequencyUint64();
             for (const auto pid : wanted) {
                 try {
                     auto it = entries_.find(pid);
@@ -45,24 +50,26 @@ namespace kproc
                         frames_.Consume(entry.tracker, frameBlobs_);
                         for (const auto blob : frameBlobs_) {
                             uint64_t timestamp = 0;
+                            double rawGpuBusy = 0;
                             std::memcpy(&timestamp, blob + timestampOffset_, sizeof(timestamp));
+                            std::memcpy(&rawGpuBusy, blob + gpuBusyOffset_, sizeof(rawGpuBusy));
+                            if (timestamp == 0) {
+                                entry.samples.Reset();
+                                continue;
+                            }
+                            // Require a new set of samples after a gap in frame production.
+                            if (timestamp > entry.latestFrame && timestamp - entry.latestFrame > maxAge) {
+                                entry.samples.Reset();
+                            }
                             entry.latestFrame = std::max(entry.latestFrame, timestamp);
+                            entry.samples.Add(rawGpuBusy);
                         }
                         if (!frameBlobs_.AllBlobsPopulated()) break;
                     }
                     const auto now = (uint64_t)pmon::util::GetCurrentTimestamp();
-                    const auto maxAge = 2 * pmon::util::GetTimestampFrequencyUint64();
                     if (entry.latestFrame == 0 || entry.latestFrame > now || now - entry.latestFrame > maxAge) continue;
 
-                    entry.query.Poll(entry.tracker, entry.blobs);
-                    for (const auto blob : entry.blobs) {
-                        double fps = 0;
-                        std::memcpy(&fps, blob + entry.fpsOffset, sizeof(fps));
-                        if (std::isfinite(fps) && fps > 0) {
-                            eligible.push_back(pid);
-                            break;
-                        }
-                    }
+                    if (entry.samples.HasVariation()) eligible.push_back(pid);
                 }
                 catch (const pmapi::ApiErrorException& ex) {
                     entries_.erase(pid);
@@ -76,25 +83,16 @@ namespace kproc
     private:
         struct Entry
         {
-            Entry(pmapi::Session& session, uint32_t pid) : tracker{ session.TrackProcess(pid) }
-            {
-                std::array elements{ PM_QUERY_ELEMENT{ .metric = PM_METRIC_PRESENTED_FPS, .stat = PM_STAT_AVG } };
-                query = session.RegisterDynamicQuery(elements, 1000., 1020.);
-                fpsOffset = elements[0].dataOffset;
-                blobs = query.MakeBlobContainer(16);
-            }
+            Entry(pmapi::Session& session, uint32_t pid) : tracker{ session.TrackProcess(pid) } {}
             pmapi::ProcessTracker tracker;
-            // Dynamic queries cache the last FPS value. Keep that cache per process and
-            // require recent frame timestamps above so cached FPS cannot qualify a stale target.
-            pmapi::DynamicQuery query;
-            pmapi::BlobContainer blobs;
-            uint64_t fpsOffset = 0;
+            GpuBusySampleWindow samples;
             uint64_t latestFrame = 0;
         };
         pmapi::Session session_;
         pmapi::FrameQuery frames_;
         pmapi::BlobContainer frameBlobs_;
         uint64_t timestampOffset_ = 0;
+        uint64_t gpuBusyOffset_ = 0;
         std::unordered_map<uint32_t, std::unique_ptr<Entry>> entries_;
     };
 }

@@ -18,7 +18,8 @@ the complete build, service, and installer instructions.
 - `Services/WindowsServices.cs`: native window/process discovery and PDH-based
   automatic GPU targeting.
 - `PresentMonUI.Core/AutomaticTargeting.cs`: periodic selection among candidates
-  with measurable FPS, with revision checks for scans superseded by user input.
+  with changing raw GPU Busy samples, with revision checks for scans superseded
+  by user input.
 - `PresentMonUI.Core`: JSON models/migrations, specification construction,
   atomic persistence, and the binary named-pipe client.
 - `Assets/Presets`: the four built-in overlay loadouts.
@@ -37,16 +38,32 @@ GPU running-time increase over the same 100 ms interval. Candidates still use
 the visible-window and optional target-blocklist filters. The highest positive
 GPU load wins; equal loads are ordered by PID.
 
-The kernel's `ProbeFps` action maintains separate PresentMon tracking for the
-candidates. A candidate must have finite, positive Presented FPS and a Present
-timestamp within the last two seconds. FPS is queried over a one-second window
-with a 1020 ms offset to accommodate normal ETW delivery. New games can therefore
-take a few seconds to qualify. Per-process queries and recent-frame checks keep
-cached FPS from qualifying another process or an inactive target.
+Scans run sequentially without overlapping, and GPU sampling runs off the UI
+thread. Only candidates with finite, positive GPU load start raw frame tracking;
+idle candidates release their previous probe trackers. No active candidates or disabling
+automatic targeting releases the entire probe session. Periodic discovery skips
+window titles and display sorting. Returning candidates must warm up their raw
+sample window again before they qualify.
 
-If no candidate qualifies, the selection is cleared. Enabling automatic
-targeting clears the existing selection; disabling it keeps the current target
-and releases the probe session. Manual selections while enabled can be replaced
+The kernel's `ProbeGpuBusy` action maintains separate PresentMon tracking for
+the candidates. It consumes raw per-frame `PM_METRIC_GPU_BUSY` values without
+averaging or rounding and keeps each process's latest ten samples. A candidate
+qualifies only when all ten samples are finite and at least one differs from
+another. Constant values (including all zero), missing/invalid samples, and
+fewer than ten samples do not qualify. This replaces the previous Presented FPS
+check. No minimum size of the raw value change is imposed.
+
+The latest Present timestamp must also be within the last two seconds. A gap of
+more than two seconds resets the sample window, so an inactive process cannot
+qualify using an old change. New or resumed candidates need ten samples before
+selection; the delay depends on their frame rate and ETW delivery.
+
+If no candidate qualifies, the current selection and any active recording are
+preserved, even when the current target also fails the raw-sample check. An
+empty selection stays empty. Later scans can still switch to an eligible
+candidate. Process exit is handled separately and still clears the target.
+Enabling automatic targeting clears the existing selection; disabling it keeps
+the current target and releases the probe session. Manual selections while enabled can be replaced
 on a subsequent scan. Any target change uses the usual capture-stop path, so an
 active recording ends before switching. An OFF/ON toggle, manual selection, or
 settings change during a scan invalidates that scan's result.
@@ -88,7 +105,7 @@ dotnet build IntelPresentMon\AppWinUI\PresentMonUI.Core.Tests\PresentMonUI.Core.
 dotnet run --project IntelPresentMon\AppWinUI\PresentMonUI.Core.Tests\PresentMonUI.Core.Tests.csproj --no-build
 ```
 
-The managed suite has 28 checks covering all four built-in presets, migrations,
+The managed suite has 30 checks covering all four built-in presets, migrations,
 metric/device resolution, nested change tracking, atomic persistence, native
 launch arguments and unsupported options, framing, cancellation, error responses,
 actual native cereal fixtures, and automatic target selection/reselection. The
@@ -96,9 +113,11 @@ automatic targeting checks cover unmeasurable candidates, game exit/restart,
 switching between running games, and superseded scans. The fixture generator and provenance are in
 `PresentMonUI.Core.Tests/NativeFixtures`.
 `-RunNativeTests` on the build helper additionally builds and runs the C++ suite.
-`RealtimeFpsProbeFiltersAndReacquiresTargets` in `PresentMonAPI2Tests` exercises
-FPS eligibility with real rendering, non-presenting processes, process restart,
-cached data expiry, and independent overlay tracking.
+`GpuBusySampleWindowTests` covers ten-sample warmup, constant values, a change at
+any sample position, sliding-window expiry, invalid samples, and raw precision.
+`RealtimeGpuBusyProbeFiltersAndReacquiresTargets` in `PresentMonAPI2Tests`
+exercises raw GPU Busy eligibility with real rendering, non-presenting
+processes, process restart, stale data expiry, and independent overlay tracking.
 
 ## Desktop verification on 2026-09-12
 

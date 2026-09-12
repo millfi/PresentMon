@@ -104,6 +104,7 @@
   <ItemGroup>
     <ClCompile Include="ExtremeQueue.cpp" />
     <ClCompile Include="FixedVectorTests.cpp" />
+    <ClCompile Include="GpuBusySampleWindowTests.cpp" />
     <ClCompile Include="InterPresentActivityTests.cpp" />
     <ClCompile Include="LoggingTests.cpp" />
     <ClCompile Include="OptionalDebugLayerTests.cpp" />

@@ -46,12 +46,14 @@ rejected. Connection establishment is bounded to 10 seconds and requests to
 ## Operations and events
 
 Requests are `OpenSession`, `Introspect`, `PushSpecification`, `BindHotkey`,
-`ClearHotkey`, `SetCapture`, `SetEtlLogging` and `ProbeFps`. Events are `HotkeyFiredAction`,
+`ClearHotkey`, `SetCapture`, `SetEtlLogging` and `ProbeGpuBusy`. Events are `HotkeyFiredAction`,
 `TargetLostAction`, `PresentmonInitFailedAction`, `OverlayDiedAction` and
 `StalePidAction`.
 
-`ProbeFps` takes a cereal vector of `uint32` candidate PIDs and returns a vector
-of PIDs with positive finite Presented FPS and recent frame activity. The kernel
+`ProbeGpuBusy` takes a cereal vector of `uint32` candidate PIDs and returns a
+vector of PIDs whose latest ten raw per-frame GPU Busy samples are finite and
+not all equal, with recent frame activity. Raw values are neither averaged nor
+rounded. The kernel
 retains candidate trackers in a separate API session between requests, removes
 trackers omitted from the next request, and releases the entire probe session
 for an empty request or a UI disconnect. New candidates may return no result

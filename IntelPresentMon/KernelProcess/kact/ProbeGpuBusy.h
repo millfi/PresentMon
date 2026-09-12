@@ -6,7 +6,7 @@
 #include <Core/source/cli/CliOptions.h>
 #include <cereal/types/vector.hpp>
 
-#define ACT_NAME ProbeFps
+#define ACT_NAME ProbeGpuBusy
 #define ACT_EXEC_CTX KernelExecutionContext
 #define ACT_TYPE AsyncActionBase_
 #define ACT_NS kproc::kact
@@ -34,16 +34,16 @@ namespace ACT_NS
         static Response Execute_(const ACT_EXEC_CTX&, SessionContext& stx, Params&& in)
         {
             if (in.pids.empty()) {
-                stx.pFpsProbe.reset();
+                stx.pGpuBusyProbe.reset();
                 return {};
             }
-            if (!stx.pFpsProbe) {
+            if (!stx.pGpuBusyProbe) {
                 const auto& opt = p2c::cli::Options::Get();
                 auto session = opt.controlPipe || opt.svcAsChild
                     ? pmapi::Session{ *opt.controlPipe } : pmapi::Session{};
-                stx.pFpsProbe = std::make_unique<FpsProbe>(std::move(session));
+                stx.pGpuBusyProbe = std::make_unique<GpuBusyProbe>(std::move(session));
             }
-            return { stx.pFpsProbe->Poll(in.pids) };
+            return { stx.pGpuBusyProbe->Poll(in.pids) };
         }
     };
     ACTION_REG();

@@ -96,8 +96,8 @@ public sealed class KernelClient : IAsyncDisposable
     public Task SetCaptureAsync(bool active, CancellationToken cancellationToken = default) =>
         EmptyRequestAsync("SetCapture", writer => writer.Bool(active), cancellationToken);
 
-    public async Task<IReadOnlyList<int>> ProbeFpsAsync(int[] pids, CancellationToken cancellationToken = default) =>
-        await RequestAsync("ProbeFps", writer => writer.List(pids, pid => writer.UInt32(checked((uint)pid))),
+    public async Task<IReadOnlyList<int>> ProbeGpuBusyAsync(int[] pids, CancellationToken cancellationToken = default) =>
+        await RequestAsync("ProbeGpuBusy", writer => writer.List(pids, pid => writer.UInt32(checked((uint)pid))),
             reader => reader.List(() => checked((int)reader.UInt32()), sizeof(uint)), cancellationToken).ConfigureAwait(false);
 
     public Task SetEtlLoggingAsync(bool active, CancellationToken cancellationToken = default) =>

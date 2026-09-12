@@ -7,7 +7,7 @@
 #include "TestProcess.h"
 #include "../PresentMonAPIWrapper/FixedQuery.h"
 #include "../PresentMonAPIWrapper/PresentMonAPIWrapper.h"
-#include "../KernelProcess/FpsProbe.h"
+#include "../KernelProcess/GpuBusyProbe.h"
 #include <chrono>
 #include <filesystem>
 #include <format>
@@ -104,7 +104,7 @@ namespace RealtimeMetricTests
 			Assert::IsTrue((bool)pSession);
 		}
 
-        TEST_METHOD(RealtimeFpsProbeFiltersAndReacquiresTargets)
+        TEST_METHOD(RealtimeGpuBusyProbeFiltersAndReacquiresTargets)
         {
             auto presenter = LaunchPresenter_(fixture_);
             const auto gameA = presenter.GetId();
@@ -112,33 +112,38 @@ namespace RealtimeMetricTests
             auto overlaySession = OpenSession_(fixture_);
             auto overlayTracker = TrackPresenterAndWaitForFirstFrame_(
                 *overlaySession, fixture_, presenter, "auto-target-overlay", 10);
-            kproc::FpsProbe probe{ pmapi::Session{ fixture_.GetCommonArgs().ctrlPipe } };
+            kproc::GpuBusyProbe probe{ pmapi::Session{ fixture_.GetCommonArgs().ctrlPipe } };
 
             const auto waitForGame = [&](uint32_t game) {
                 const auto deadline = std::chrono::steady_clock::now() + 10s;
                 do {
                     const auto candidates = probe.Poll({ appB, game });
-                    Assert::IsFalse(std::ranges::contains(candidates, appB), L"A non-presenting process qualified for FPS");
+                    Assert::IsFalse(std::ranges::contains(candidates, appB), L"A non-presenting process qualified for GPU Busy variation");
                     if (std::ranges::contains(candidates, game)) return;
                     std::this_thread::sleep_for(100ms);
                 } while (std::chrono::steady_clock::now() < deadline);
-                Assert::Fail(L"Rendering process did not become FPS-measurable");
+                Assert::Fail(L"Rendering process did not produce ten changing raw GPU Busy samples");
             };
 
             waitForGame(gameA);
-            Assert::IsTrue(probe.Poll({ appB }).empty(), L"FPS from A leaked into B's eligibility");
+            Assert::IsTrue(probe.Poll({ appB }).empty(), L"Raw samples from A leaked into B's eligibility");
             Assert::IsTrue(probe.Poll({}).empty(), L"Empty candidate set did not release probe tracking");
 
             PM_BEGIN_FIXED_DYNAMIC_QUERY(OverlayQuery)
                 pmapi::FixedQueryElement fps{ this, PM_METRIC_PRESENTED_FPS, PM_STAT_AVG };
             PM_END_FIXED_QUERY overlayQuery{ *overlaySession, 1000., 1020., 1 };
-            overlayQuery.Poll(overlayTracker);
+            const auto overlayDeadline = std::chrono::steady_clock::now() + 5s;
+            do {
+                overlayQuery.Poll(overlayTracker);
+                if (overlayQuery.fps.As<double>() > 0.) break;
+                std::this_thread::sleep_for(100ms);
+            } while (std::chrono::steady_clock::now() < overlayDeadline);
             Assert::IsTrue(overlayQuery.fps.As<double>() > 0., L"Probing/releasing A disrupted independent overlay tracking");
 
             waitForGame(gameA);
             presenter.Murder();
             std::this_thread::sleep_for(2200ms);
-            Assert::IsTrue(probe.Poll({ appB, gameA }).empty(), L"Cached FPS kept an exited game eligible");
+            Assert::IsTrue(probe.Poll({ appB, gameA }).empty(), L"Stale raw samples kept an exited game eligible");
             auto restarted = LaunchPresenter_(fixture_);
             waitForGame(restarted.GetId());
             auto gameC = LaunchPresenter_(fixture_);

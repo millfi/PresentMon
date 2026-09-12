@@ -32,10 +32,13 @@
     <ClInclude Include="kact\Introspect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="kact\ProbeFps.h">
+    <ClInclude Include="kact\ProbeGpuBusy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FpsProbe.h">
+    <ClInclude Include="GpuBusyProbe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuBusySampleWindow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="kact\KernelExecutionContext.h">

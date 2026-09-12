@@ -2,7 +2,7 @@
 #include "OpenSession.h"
 #include "SetCapture.h"
 #include "Introspect.h"
-#include "ProbeFps.h"
+#include "ProbeGpuBusy.h"
 #include "PushSpecification.h"
 #include "BindHotkey.h"
 #include "ClearHotkey.h"

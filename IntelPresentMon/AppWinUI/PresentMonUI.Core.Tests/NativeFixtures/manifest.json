@@ -1,0 +1,86 @@
+{
+  "cerealVersion": "1.3.2",
+  "cerealSource": "https://github.com/USCiLab/cereal/archive/refs/tags/v1.3.2.zip",
+  "cerealArchiveSha256": "E72C3FA8FE3D531247773E346E6824A4744CC6472A25CF9B30599CD52146E2AE",
+  "compiler": "19.51.36256.0",
+  "platform": "Windows x64, little-endian",
+  "framing": "uint32 body byte count; cereal BinaryOutputArchive(PacketHeader, payload)",
+  "sourceHeaders": [
+    {
+      "path": "IntelPresentMon/KernelProcess/kact/PushSpecification.h",
+      "sha256": "30F9CAB3DA1A38D0863260948637487F380FBF281BABFC1ABB6BECF1D629DA72"
+    },
+    {
+      "path": "IntelPresentMon/KernelProcess/kact/Introspect.h",
+      "sha256": "E2932FE148C97D2D4E4E80D8ED35CE7A16949D6E3869F21B6A7C931374251246"
+    },
+    {
+      "path": "IntelPresentMon/KernelProcess/kact/OpenSession.h",
+      "sha256": "605AC1721A6EAA8EC877C8DB928F95CD19A41970FF2207014F10FC7B8C751002"
+    },
+    {
+      "path": "IntelPresentMon/KernelProcess/kact/BindHotkey.h",
+      "sha256": "2F1C785753ABF1A41BF3DBD661BCFF6610BCF3BB7663D924AEF56AD15584975F"
+    },
+    {
+      "path": "IntelPresentMon/Core/source/kernel/OverlaySpec.h",
+      "sha256": "7A115CA8B85C4538389D2A88AB89C95524A452FD974A94F55D09FAB8EFE1BD36"
+    },
+    {
+      "path": "IntelPresentMon/Core/source/gfx/layout/Enums.h",
+      "sha256": "8CC1120EC7C4B0C0C68641DEEEBD21DEB221E232484D96B06BD3A0C9CF16997D"
+    },
+    {
+      "path": "IntelPresentMon/Core/source/gfx/layout/EnumUtils.h",
+      "sha256": "3E24C4A873E7160BA4A7EE18DC8728AE3E8B6135A00291350A07A271E715AC49"
+    },
+    {
+      "path": "IntelPresentMon/Interprocess/source/act/Packet.h",
+      "sha256": "D2ECDF28FFE095DC3094E1EE408C2B603C025CA0A67E36156A76B527C9296007"
+    },
+    {
+      "path": "IntelPresentMon/PresentMonAPI2/PresentMonAPI.h",
+      "sha256": "B6826AC4F56885B6BE0FCFEE9FF762CF7B9C3076A6B390C67FDA3AF29B78426F"
+    },
+    {
+      "path": "IntelPresentMon/Core/source/gfx/base/Geometry.h",
+      "sha256": "E86A3BDF96C996F4C5D95C4C0D62FEB37496F3C44828705EAF8610F9E5FF5B8F"
+    },
+    {
+      "path": "IntelPresentMon/CommonUtilities/pipe/Pipe.h",
+      "sha256": "4123AB0A24847F9F4786566A9C9695131CEBEC3BF4B1F5FAECCB4E845A969A56"
+    }
+  ],
+  "fixtures": [
+    {
+      "file": "bind-hotkey.bin",
+      "bytes": 66,
+      "sha256": "B238DB86DA3ECB7F372BCDE9A6CCCF91D7665C63A5ACB876135D680BD1EDD572"
+    },
+    {
+      "file": "empty-spec.bin",
+      "bytes": 228,
+      "sha256": "D88698E52DD7413FEE45534845A2D2C9D4B40292CF02C0463AD872A8BE6D50CF"
+    },
+    {
+      "file": "full-spec.bin",
+      "bytes": 614,
+      "sha256": "92739C345FCA583B2B25D0C4C8500B7E066B6F30F1C465B19ED609387560EAC3"
+    },
+    {
+      "file": "introspect.bin",
+      "bytes": 764,
+      "sha256": "7E0B92B300120C08FC44C32CCD3550F0FE0274B02DAD3D81B0874788193B914F"
+    },
+    {
+      "file": "open-session-response.bin",
+      "bytes": 141,
+      "sha256": "451D629DA7D5ADDDBF7E0520D053D482700D0FC4DE500D0CF88860A880B8C1ED"
+    },
+    {
+      "file": "open-session.bin",
+      "bytes": 47,
+      "sha256": "65BDA201D628EE5A0B9F95B07C837B388D9CEEA22122B4E7BE96F129E63C7263"
+    }
+  ]
+}

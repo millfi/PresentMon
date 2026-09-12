@@ -40,6 +40,7 @@
     <ClInclude Include="source\gfx\prim\BrushPrimitive.h" />
     <ClInclude Include="source\gfx\prim\DrawablePrimitive.h" />
     <ClInclude Include="source\gfx\Graphics.h" />
+    <ClInclude Include="source\gfx\OptionalDebugLayer.h" />
     <ClInclude Include="source\gfx\layout\AxisMapping.h" />
     <ClInclude Include="source\gfx\layout\Element.h" />
     <ClInclude Include="source\gfx\layout\Geometry.h" />

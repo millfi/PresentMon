@@ -1,0 +1,135 @@
+{
+    "header": {
+        "value0": "Introspect",
+        "value1": 23,
+        "value2": 0,
+        "value3": 0,
+        "value4": 0,
+        "value5": 1,
+        "value6": 1
+    },
+    "payload": {
+        "metrics": [
+            {
+                "id": 11,
+                "name": "Displayed FPS",
+                "description": "Displayed frames per second",
+                "deviceType": 0,
+                "preferredUnitId": 4,
+                "deviceAvailability": [
+                    {
+                        "deviceId": 0,
+                        "arraySize": 1,
+                        "availabilityId": 0
+                    },
+                    {
+                        "deviceId": 7,
+                        "arraySize": 2,
+                        "availabilityId": 3
+                    }
+                ],
+                "availableStatIds": [
+                    1,
+                    2
+                ],
+                "numeric": true
+            },
+            {
+                "id": 14,
+                "name": "GPU Busy",
+                "description": "GPU busy time",
+                "deviceType": 1,
+                "preferredUnitId": 6,
+                "deviceAvailability": [
+                    {
+                        "deviceId": 7,
+                        "arraySize": 3,
+                        "availabilityId": 0
+                    },
+                    {
+                        "deviceId": 9,
+                        "arraySize": 4,
+                        "availabilityId": 2
+                    }
+                ],
+                "availableStatIds": [
+                    8
+                ],
+                "numeric": true
+            },
+            {
+                "id": 5,
+                "name": "CPU Name",
+                "description": "Processor model",
+                "deviceType": 2,
+                "preferredUnitId": 0,
+                "deviceAvailability": [
+                    {
+                        "deviceId": 12,
+                        "arraySize": 1,
+                        "availabilityId": 0
+                    }
+                ],
+                "availableStatIds": [
+                    0
+                ],
+                "numeric": false
+            }
+        ],
+        "stats": [
+            {
+                "id": 0,
+                "name": "None",
+                "shortName": "",
+                "description": "Unaggregated value"
+            },
+            {
+                "id": 1,
+                "name": "Average",
+                "shortName": "Avg",
+                "description": "Arithmetic mean"
+            },
+            {
+                "id": 2,
+                "name": "99th percentile",
+                "shortName": "P99",
+                "description": "Upper percentile"
+            },
+            {
+                "id": 8,
+                "name": "Maximum",
+                "shortName": "Max",
+                "description": "Largest sample"
+            }
+        ],
+        "units": [],
+        "adapters": [
+            {
+                "id": 7,
+                "vendor": "Intel",
+                "name": "Fixture Arc"
+            },
+            {
+                "id": 9,
+                "vendor": "Other",
+                "name": "Fixture GPU"
+            }
+        ],
+        "systemDeviceId": 12,
+        "defaultAdapterId": 9,
+        "metricAvailabilityReasons": [
+            {
+                "id": 0,
+                "description": "Available"
+            },
+            {
+                "id": 2,
+                "description": "Not exported by source"
+            },
+            {
+                "id": 3,
+                "description": "Not supported by device"
+            }
+        ]
+    }
+}

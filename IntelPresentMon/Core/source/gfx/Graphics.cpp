@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Graphics.h"
 #include "Exception.h"
+#include "OptionalDebugLayer.h"
 #include <Core/source/infra/Logging.h>
 #include <CommonUtilities/log/HrLogger.h>
 
@@ -22,17 +23,20 @@ namespace p2c::gfx
         enableAlpha{ enableAlpha }
 	{
         // Direct3D 11 stuff
-        if (auto hr = D3D11CreateDevice(
-            nullptr,    // Adapter
-            D3D_DRIVER_TYPE_HARDWARE,
-            nullptr,    // Module
-            D3D11_CREATE_DEVICE_BGRA_SUPPORT | (IS_DEBUG ? D3D11_CREATE_DEVICE_DEBUG : 0),
-            nullptr, 0, // Highest available feature level
-            D3D11_SDK_VERSION,
-            &pDevice,
-            nullptr,    // Actual feature level
-            &pContext3d// Device context
-        ); FAILED(hr))
+        bool debugLayerEnabled = IS_DEBUG;
+        if (auto hr = CreateWithOptionalDebugLayer(debugLayerEnabled, [&](bool debug) {
+            return D3D11CreateDevice(
+                nullptr,    // Adapter
+                D3D_DRIVER_TYPE_HARDWARE,
+                nullptr,    // Module
+                D3D11_CREATE_DEVICE_BGRA_SUPPORT | (debug ? D3D11_CREATE_DEVICE_DEBUG : 0),
+                nullptr, 0, // Highest available feature level
+                D3D11_SDK_VERSION,
+                pDevice.ReleaseAndGetAddressOf(),
+                nullptr,    // Actual feature level
+                pContext3d.ReleaseAndGetAddressOf()
+            );
+        }); FAILED(hr))
         {
             pmlog_error().hr(hr);
         }
@@ -44,12 +48,18 @@ namespace p2c::gfx
         }
 
         ComPtr<IDXGIFactory2> pDxgiFactory;
-        if (auto hr = CreateDXGIFactory2(
-            IS_DEBUG ? DXGI_CREATE_FACTORY_DEBUG : 0,
-            IID_PPV_ARGS(&pDxgiFactory)
-        ); FAILED(hr))
+        if (auto hr = CreateWithOptionalDebugLayer(debugLayerEnabled, [&](bool debug) {
+            return CreateDXGIFactory2(
+                debug ? DXGI_CREATE_FACTORY_DEBUG : 0,
+                IID_PPV_ARGS(pDxgiFactory.ReleaseAndGetAddressOf())
+            );
+        }); FAILED(hr))
         {
             pmlog_error().hr(hr);
+        }
+
+        if (IS_DEBUG && !debugLayerEnabled) {
+            pmlog_warn("DirectX debug layers are unavailable; continuing without graphics debug diagnostics");
         }
 
         if (enableTearing) {
@@ -98,7 +108,7 @@ namespace p2c::gfx
             if (auto hr = pDxgiFactory->CreateSwapChainForComposition(
                 pDxgiDevice.Get(),
                 &description,
-                nullptr, // Don�t restrict
+                nullptr, // Do not restrict
                 &pSwapChain
             ); FAILED(hr))
             {
@@ -156,7 +166,7 @@ namespace p2c::gfx
         // Create a single-threaded Direct2D factory with debugging information
         if (auto hr = D2D1CreateFactory(
             D2D1_FACTORY_TYPE_SINGLE_THREADED,
-            IS_DEBUG ? D2D1_FACTORY_OPTIONS{ D2D1_DEBUG_LEVEL_INFORMATION } : D2D1_FACTORY_OPTIONS{},
+            debugLayerEnabled ? D2D1_FACTORY_OPTIONS{ D2D1_DEBUG_LEVEL_INFORMATION } : D2D1_FACTORY_OPTIONS{},
             pFactory2d.GetAddressOf()
         ); FAILED(hr))
         {

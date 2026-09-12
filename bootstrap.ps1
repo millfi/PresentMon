@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch]$SkipAuxiliaryData
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -26,21 +28,14 @@ function Invoke-BootstrapStep {
 }
 
 try {
-    Invoke-BootstrapStep "Pull CEF" {
-        & (Join-Path $repoRoot "IntelPresentMon\AppCef\Batch\pull-cef.ps1")
-    }
-
-    Invoke-BootstrapStep "Pull auxiliary test data" {
-        & (Join-Path $repoRoot "Tests\pull-aux.ps1")
-    }
-
-    Invoke-BootstrapStep "Build frontend" {
-        Push-Location (Join-Path $repoRoot "IntelPresentMon\AppCef")
-        try {
-            & (Join-Path $repoRoot "IntelPresentMon\AppCef\Batch\build-web.bat")
-        } finally {
-            Pop-Location
+    if (-not $SkipAuxiliaryData) {
+        Invoke-BootstrapStep "Pull auxiliary test data" {
+            & (Join-Path $repoRoot "Tests\pull-aux.ps1")
         }
+    }
+
+    Invoke-BootstrapStep "Restore WinUI application" {
+        dotnet restore (Join-Path $repoRoot "IntelPresentMon\AppWinUI\PresentMonUI.csproj") -p:Platform=x64 -p:RuntimeIdentifier=win-x64
     }
 } finally {
     Set-Location $originalLocation

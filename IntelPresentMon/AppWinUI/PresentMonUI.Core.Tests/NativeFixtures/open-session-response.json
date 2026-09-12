@@ -1,0 +1,18 @@
+{
+    "header": {
+        "value0": "OpenSession",
+        "value1": 29,
+        "value2": 0,
+        "value3": 0,
+        "value4": 0,
+        "value5": 1,
+        "value6": 1
+    },
+    "payload": {
+        "value0": 65432,
+        "value1": "0123456789abcdef",
+        "value2": "2026-09-12T09:10:11Z",
+        "value3": "2.4.0",
+        "value4": "3.4.0 fixture Release"
+    }
+}

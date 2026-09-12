@@ -5,6 +5,7 @@
     <ClCompile Include="ExtremeQueue.cpp" />
     <ClCompile Include="FixedVectorTests.cpp" />
     <ClCompile Include="LoggingTests.cpp" />
+    <ClCompile Include="OptionalDebugLayerTests.cpp" />
     <ClCompile Include="MetricCapabilitiesTests.cpp" />
     <ClCompile Include="MetricsCore.cpp" />
     <ClCompile Include="TelemetryAvailabilityMergeTests.cpp" />

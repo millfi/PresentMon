@@ -549,7 +549,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		p2c::kern::Kernel* pKernel = nullptr;
 		// active object that creates a window and sinks raw input messages to listen for hotkey presses
 		p2c::win::Hotkeys hotkeys;
-		// this server receives a connection from the CEF render process
+		// The UI connects to the existing action channel.
 		const auto actName = std::format(R"(\\.\pipe\ipm-cef-channel-{})", GetCurrentProcessId());
 		KernelServer server{ kact::KernelExecutionContext{ .ppKernel = &pKernel, .pHotkeys = &hotkeys },
 			actName, 1, "D:(A;;GA;;;WD)S:(ML;;NW;;;ME)", headless };
@@ -574,9 +574,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		pKernel = &kernel;
 		// run the UI when not headless
 		if (!headless) {
-			uint64_t uiLaunchAttempt = 0;
 			for (;;) {
-				// compose optional cli args for cef process tree
+				// Compose optional command-line arguments for the native UI.
 				auto args = std::vector<std::string>{
 					opt.filesWorking ? "--p2c-files-working"s : ""s,
 					opt.traceExceptions ? "--p2c-trace-exceptions"s : ""s,
@@ -587,34 +586,22 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 					args.push_back("--p2c-log-verbose-modules"s);
 					args.append_range(*opt.logVerboseModules | vi::transform(util::log::GetVerboseModuleName));
 				}
-				bool allOriginsAllowed = false;
 				for (auto& f : *opt.uiFlags) {
-					if (f == "enable-chromium-debug") {
-						// needed in order to connect Chrome debuggers to CEF
-						args.push_back("--remote-allow-origins=*");
-						allOriginsAllowed = true;
-					}
 					args.push_back("--p2c-" + f);
 				}
 				for (auto& o : *opt.uiOptions) {
-					if (o.first == "url" && is_debug && !allOriginsAllowed) {
-						// needed in order to connect Chrome debuggers to CEF
-						args.push_back("--remote-allow-origins=*");
-					}
 					args.push_back("--p2c-" + o.first);
 					args.push_back(o.second);
 				}
-				const auto cefLogPipe = std::format("pm-ui-log-{}-{}", GetCurrentProcessId(), uiLaunchAttempt++);
 				// add fixed CLI options to the args vector
 				args.append_range(std::vector{
 					"--p2c-log-level"s, util::log::GetLevelName(*opt.logLevel),
 					"--p2c-log-trace-level"s, util::log::GetLevelName(*opt.logTraceLevel),
 					"--p2c-ui-mutex-name"s, *opt.uiMutexName,
-					"--p2c-act-name"s, actName,
-					"--p2c-log-pipe-name"s, cefLogPipe
+					"--p2c-act-name"s, actName
 				});
-				// launch the CEF browser process, which in turn launches all the other processes in the CEF process constellation
-				auto cefChild = [&] {
+				// Launch the unpackaged WinUI application with its self-contained runtime.
+				auto uiChild = [&] {
 					// WORKAROUND: keep a relative exe name while forcing install-dir cwd for child startup.
 					// Remove this when our Boost.Process version no longer breaks cli args for absolute exe paths.
 					::pmon::util::file::ScopedWorkingDirectory setInstallWorkingDirectory{
@@ -625,7 +612,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 							pmlog_info("detected elevation, attempting integrity downgrade");
 							auto mediumTokenPack = util::win::PrepareMediumIntegrityToken();
 							return bp2::windows::as_user_launcher{ mediumTokenPack.hMediumToken.Get() }(
-								ioctx, "PresentMonUI.exe"s, args
+								ioctx, "ui\\PresentMonUI.exe"s, args
 								);
 						}
 						catch (...) {
@@ -633,27 +620,24 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 						}
 					}
 					return bp2::windows::default_launcher{}(
-						ioctx, "PresentMonUI.exe"s, args
+						ioctx, "ui\\PresentMonUI.exe"s, args
 						);
 				}();
 
-				KillOnCloseJob uiJob{ cefChild.native_handle() };
+				KillOnCloseJob uiJob{ uiChild.native_handle() };
 
-				// connect logging to the CEF process constellation
-				ConnectToLoggingSourcePipe(cefLogPipe);
-
-				// don't exit this process until the CEF control panel exits
-				const auto cefExitCode = cefChild.wait();
-				if (cefExitCode == p2c::client::util::UiAlreadyRunningExitCode) {
-					pmlog_warn("UI client reported existing browser process; handling duplicate UI launch action");
+				// Keep the kernel alive until the control panel closes.
+				const auto uiExitCode = uiChild.wait();
+				if (uiExitCode == p2c::client::util::UiAlreadyRunningExitCode) {
+					pmlog_warn("UI client reported an existing instance; handling duplicate UI launch action");
 					if (const auto duplicateResult = HandleConcurrentUiInstance_(*opt.uiMutexName, *opt.duplicateUiResponse)) {
 						return duplicateResult;
 					}
 					continue;
 				}
-				if (cefExitCode != 0) {
-					pmlog_warn(std::format("UI client exited with code {}", cefExitCode));
-					return cefExitCode;
+				if (uiExitCode != 0) {
+					pmlog_warn(std::format("UI client exited with code {}", uiExitCode));
+					return uiExitCode;
 				}
 				break;
 			}

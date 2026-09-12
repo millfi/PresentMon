@@ -4778,19 +4778,34 @@ TEST_CLASS(ComputeMetricsForPresentTests)
             // so this is emitted immediately and UpdateAfterReadyDisplayRow is called.
             // lastDisplayedScreenTime must remain 100 after this.
             (void)Process(qpc, swapChain, MakeFrame(PresentResult::Discarded, 950, 10, 950, {}));
+            Assert::AreEqual((uint64_t)100, swapChain.swapChain.lastDisplayedScreenTime);
 
             // The first queued app anchor. Its previousDisplayedScreenTime must be
             // derived from the seed (100), not from the zeroed-out state (0).
             Assert::AreEqual(size_t(0), Process(qpc, swapChain, MakeFrame(PresentResult::Presented, 1000, 16, 1000,
                 { { FrameType::Application, 116 } }, 1016)).size());
 
-            auto rows = Process(qpc, swapChain, MakeFrame(PresentResult::Presented, 1100, 16, 1100,
+            auto originRows = swapChain.EnqueueReadyDisplayRows(qpc, MakeFrame(PresentResult::Presented, 1100, 16, 1100,
                 { { FrameType::Application, 132 } }, 1032));
+            Assert::AreEqual((size_t)1, originRows.size());
+            Assert::AreEqual((uint64_t)100, originRows[0].previousDisplayedScreenTime);
+            Assert::AreEqual((uint64_t)116, originRows[0].screenTime);
+
+            // The seed does not establish an animation anchor. The first queued app
+            // row is the timeline origin, so its animation error is intentionally missing.
+            const auto origin = ComputeMetricsForReadyDisplayRow(qpc, originRows[0], swapChain.swapChain);
+            Assert::IsFalse(HasMetricValue(origin.metrics.msAnimationError));
+            AssertAreEqualWithinTolerance(16.0, origin.metrics.msAnimationTime, 0.0001);
+
+            // Another display lookahead releases the first resolved animation interval.
+            auto rows = Process(qpc, swapChain, MakeFrame(PresentResult::Presented, 1200, 16, 1200,
+                { { FrameType::Application, 148 } }, 1048));
 
             Assert::AreEqual(size_t(1), rows.size());
+            Assert::AreEqual((uint64_t)132, rows[0].screenTimeQpc);
             // simStep = (1032 - 1016) / 1 = 16ms; displayStep = delta(116, 132) = 16ms
-            Assert::AreEqual(0.0, rows[0].msAnimationError, 0.0001);
-            Assert::AreEqual(16.0, rows[0].msAnimationTime, 0.0001);
+            AssertAreEqualWithinTolerance(0.0, rows[0].msAnimationError, 0.0001);
+            AssertAreEqualWithinTolerance(32.0, rows[0].msAnimationTime, 0.0001);
         }
 
         TEST_METHOD(DroppedFrames_DoNotEnterAnimationIntervals)

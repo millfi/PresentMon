@@ -19,7 +19,7 @@ Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "PMInstaller", "IntelPresent
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PMInstallerExtension", "IntelPresentMon\PMInstallerExtension\PMInstallerExtension.csproj", "{9E3C74BB-12BB-40AC-86BF-818D20140CBA}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CefNano", "IntelPresentMon\AppCef\CefNano.vcxproj", "{3C80B001-E165-4E0E-A92D-5767CF4FB1F8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PresentMonUI", "IntelPresentMon\AppWinUI\PresentMonUI.csproj", "{3C80B001-E165-4E0E-A92D-5767CF4FB1F8}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SDK", "SDK", "{6DCB803B-9FCE-456C-87B9-1365F59BD190}"
 EndProject
@@ -434,7 +434,7 @@ Global
 		SolutionGuid = {485BBDCE-E37E-4C3F-A336-A96029B45E1B}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		IntelPresentMon\Shaders\Shaders.vcxitems*{3c80b001-e165-4e0e-a92d-5767cf4fb1f8}*SharedItemsImports = 4
+		IntelPresentMon\Shaders\Shaders.vcxitems*{8524c555-b172-46ef-be42-7b7b7bb102e4}*SharedItemsImports = 4
 		IntelPresentMon\Shaders\Shaders.vcxitems*{51979337-0180-48bd-bad9-8aef57fef96d}*SharedItemsImports = 9
 	EndGlobalSection
 EndGlobal

@@ -88,12 +88,6 @@ namespace p2c::client::util
 			return TRUE;
 		}
 
-		std::array<wchar_t, MAX_PATH> className{};
-		if (GetClassNameW(hWnd, className.data(), (int)className.size()) == 0 ||
-			std::wstring_view{ className.data() } != UiBrowserWindowClassName) {
-			return TRUE;
-		}
-
 		std::array<wchar_t, MAX_PATH> title{};
 		if (GetWindowTextW(hWnd, title.data(), (int)title.size()) == 0 ||
 			std::wstring_view{ title.data() } != UiBrowserWindowTitle) {
@@ -101,6 +95,22 @@ namespace p2c::client::util
 		}
 
 		if (!UiBrowserWindowMutexSuffixMatches(hWnd, params.first)) {
+			return TRUE;
+		}
+
+		// WinUI owns the window class. Validate the process and the identity property instead.
+		DWORD processId = 0;
+		GetWindowThreadProcessId(hWnd, &processId);
+		::pmon::util::win::Handle process{ OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId) };
+		std::wstring executablePath(32768, L'\0');
+		DWORD pathLength = (DWORD)executablePath.size();
+		if (!process || !QueryFullProcessImageNameW(process.Get(), 0, executablePath.data(), &pathLength)) {
+			return TRUE;
+		}
+		executablePath.resize(pathLength);
+		const auto separator = executablePath.find_last_of(L"\\/");
+		const auto executableName = executablePath.c_str() + (separator == std::wstring::npos ? 0 : separator + 1);
+		if (_wcsicmp(executableName, L"PresentMonUI.exe") != 0) {
 			return TRUE;
 		}
 

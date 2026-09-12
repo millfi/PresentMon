@@ -106,6 +106,7 @@
     <ClCompile Include="FixedVectorTests.cpp" />
     <ClCompile Include="InterPresentActivityTests.cpp" />
     <ClCompile Include="LoggingTests.cpp" />
+    <ClCompile Include="OptionalDebugLayerTests.cpp" />
     <ClCompile Include="MetricCapabilitiesTests.cpp" />
     <ClCompile Include="MetricsCore.cpp" />
     <ClCompile Include="TelemetryAvailabilityMergeTests.cpp" />

@@ -46,6 +46,7 @@
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="Shared">
+    <Import Project="..\Shaders\Shaders.vcxitems" Label="Shared" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -107,13 +108,14 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <UACUIAccess>true</UACUIAccess>
+      <UACUIAccess Condition="'$(UnsignedRelease)'!='true'">true</UACUIAccess>
+      <UACUIAccess Condition="'$(UnsignedRelease)'=='true'">false</UACUIAccess>
       <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies);ntdll.lib</AdditionalDependencies>
     </Link>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(UnsignedRelease)'!='true'">
       <Command>SignTool sign /a /v /s PrivateCertStore /n "Test Certificate - For Internal Use Only" /t http://timestamp.comodoca.com/authenticode /fd sha1 "$(OutDir)$(TargetFileName)"</Command>
     </PostBuildEvent>
-    <PostBuildEvent>
+    <PostBuildEvent Condition="'$(UnsignedRelease)'!='true'">
       <Message>Sign-sign Release for local dev</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -139,8 +141,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AppCef\CefNano.vcxproj">
+    <ProjectReference Include="..\AppWinUI\PresentMonUI.csproj" Condition="'$(SkipNativeGuiBuild)'!='true'">
       <Project>{3c80b001-e165-4e0e-a92d-5767cf4fb1f8}</Project>
+      <SetPlatform>Platform=x64</SetPlatform>
+      <AdditionalProperties>RuntimeIdentifier=win-x64</AdditionalProperties>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+      <Private>false</Private>
+      <SetConfiguration Condition="'$(Configuration)'=='Release-EDSS'">Configuration=Release</SetConfiguration>
     </ProjectReference>
     <ProjectReference Include="..\CommonUtilities\CommonUtilities.vcxproj">
       <Project>{08a704d8-ca1c-45e9-8ede-542a1a43b53e}</Project>
@@ -196,6 +204,15 @@
   <Target Name="CopyPathedPresentMonCli" AfterTargets="Build">
     <MakeDir Directories="$(OutDir)pathed" />
     <Copy SourceFiles="$(ProjectDir)presentmon-cli.bat" DestinationFiles="$(OutDir)pathed\presentmon-cli.bat" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyApplicationAssets" AfterTargets="Build">
+    <ItemGroup>
+      <ApplicationPreset Include="$(ProjectDir)..\AppCef\ipm-ui-vue\presets\*.json" />
+      <ApplicationBlocklist Include="$(ProjectDir)..\AppCef\ipm-ui-vue\BlockLists\*.txt" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)Presets;$(OutDir)Blocklists" />
+    <Copy SourceFiles="@(ApplicationPreset)" DestinationFolder="$(OutDir)Presets" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ApplicationBlocklist)" DestinationFolder="$(OutDir)Blocklists" SkipUnchangedFiles="true" />
   </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

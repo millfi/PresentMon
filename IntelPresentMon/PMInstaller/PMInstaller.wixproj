@@ -28,19 +28,30 @@
     <DefineConstants>ConsoleAppVersion=$(PresentMonVersion);ProductVersion=$(PresentMonProductVersion)</DefineConstants>
     <LinkerAdditionalOptions>
     </LinkerAdditionalOptions>
-    <SuppressIces>ICE60</SuppressIces>
+    <SuppressIces>
+    </SuppressIces>
   </PropertyGroup>
   <PropertyGroup>
-    <DefineConstants>$(DefineConstants);PM.ServiceDirId=service_folder</DefineConstants>
+    <WinUIOutputDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\build\$(Configuration)\ui'))</WinUIOutputDir>
+    <WinUIHarvestFile>$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)', '$(IntermediateOutputPath)', 'WinUIFiles.wxs'))</WinUIHarvestFile>
+    <DefineConstants>$(DefineConstants);PM.ServiceDirId=service_folder;WinUIOutputDir=$(WinUIOutputDir)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="CefBinaries.wxs" />
-    <Compile Include="CefResources.wxs" />
     <Compile Include="PresentMon.wxs" />
+    <Compile Include="$(WinUIHarvestFile)" />
+    <None Include="harvest-winui.ps1" />
+    <None Include="test-winui-harvest.ps1" />
+    <None Include="test-winui-language-metadata.ps1" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="en-us.wxl" />
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <ProjectReference>
+      <SetPlatform>Platform=x64</SetPlatform>
+      <AdditionalProperties>Platform=x64</AdditionalProperties>
+    </ProjectReference>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <WixExtension Include="PMInstallerExtension">
       <HintPath>..\..\build\obj\PMInstallerExtension-$(Configuration)\PMInstallerExtension.dll</HintPath>
@@ -64,13 +75,15 @@
       <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
       <RefTargetDir>INSTALLFOLDER</RefTargetDir>
     </ProjectReference>
-    <ProjectReference Include="..\AppCef\CefNano.vcxproj">
-      <Name>PresentMon</Name>
+    <ProjectReference Include="..\AppWinUI\PresentMonUI.csproj">
+      <Name>PresentMonUI</Name>
       <Project>{3c80b001-e165-4e0e-a92d-5767cf4fb1f8}</Project>
+      <SetPlatform>Platform=x64</SetPlatform>
+      <AdditionalProperties>Platform=x64;RuntimeIdentifier=win-x64;SelfContained=true;WindowsAppSDKSelfContained=true</AdditionalProperties>
       <Private>True</Private>
       <DoNotHarvest>True</DoNotHarvest>
       <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
-      <RefTargetDir>INSTALLFOLDER</RefTargetDir>
+      <RefTargetDir>pm_app_ui_folder</RefTargetDir>
     </ProjectReference>
     <ProjectReference Include="..\KernelProcess\KernelProcess.vcxproj">
       <Name>KernelProcess</Name>
@@ -123,7 +136,7 @@
     <!-- Build the wixlib first -->
     <MSBuild Projects="..\PMInstallerLib\PMInstallerLib.wixproj"
              Targets="Build"
-             Properties="Configuration=$(Configuration);Platform=$(Platform);PMON_UCI_SDK_DIR=$(PMON_UCI_SDK_DIR)" />
+             Properties="Configuration=$(Configuration);Platform=x64;PMON_UCI_SDK_DIR=$(PMON_UCI_SDK_DIR)" />
     <ItemGroup>
       <WixLibrary Include="$(SolutionDir)build\$(Configuration)\PMInstallerLib.wixlib"
                   Condition="Exists('$(SolutionDir)build\$(Configuration)\PMInstallerLib.wixlib')" />
@@ -133,8 +146,11 @@
              Text="No wixlib found under $(SolutionDir)build\$(Configuration)\ (or ...\en-us\). Build produced nothing." />
   </Target>
 
-  <Target Name="ValidateCefInstallerInputs" BeforeTargets="Compile">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\AppCef\Batch\validate-cef.ps1&quot; -Mode Installer -OutputRoot &quot;$(MSBuildThisFileDirectory)..\..\build\$(Configuration)&quot;" />
+  <Target Name="HarvestWinUIInstallerInputs" BeforeTargets="Compile" DependsOnTargets="ResolveProjectReferences">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)harvest-winui.ps1&quot; -OutputRoot &quot;$(WinUIOutputDir)&quot; -WixFile &quot;$(WinUIHarvestFile)&quot;" />
+    <ItemGroup>
+      <FileWrites Include="$(WinUIHarvestFile)" />
+    </ItemGroup>
   </Target>
 
     <!--

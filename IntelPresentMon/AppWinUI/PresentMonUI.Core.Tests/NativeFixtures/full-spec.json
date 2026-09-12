@@ -1,0 +1,223 @@
+{
+    "header": {
+        "value0": "PushSpecification",
+        "value1": 17,
+        "value2": 0,
+        "value3": 0,
+        "value4": 0,
+        "value5": 1,
+        "value6": 1
+    },
+    "payload": {
+        "pid": {
+            "nullopt": false,
+            "data": 4242
+        },
+        "preferences": {
+            "capturePath": "C:\\Captures\\native-fixture",
+            "captureDelay": 3,
+            "enableCaptureDelay": true,
+            "captureDuration": 61,
+            "enableCaptureDuration": false,
+            "hideDuringCapture": true,
+            "hideAlways": false,
+            "enablePerMetricDeviceSelection": true,
+            "independentWindow": true,
+            "metricPollRate": 47,
+            "overlayDrawRate": 29,
+            "telemetrySamplingPeriodMs": 113,
+            "etwFlushPeriod": 17,
+            "manualEtwFlush": false,
+            "metricsOffset": 157,
+            "metricsWindow": 1021,
+            "overlayPosition": 3,
+            "timeRange": 13.5,
+            "overlayMargin": 1.25,
+            "overlayBorder": 2.5,
+            "overlayPadding": 3.75,
+            "graphMargin": 4.25,
+            "graphBorder": 5.5,
+            "graphPadding": 6.75,
+            "overlayBorderColor": {
+                "s.r": 0.04313725605607033,
+                "s.g": 0.09019608050584793,
+                "s.b": 0.14509804546833039,
+                "s.a": 0.25
+            },
+            "overlayBackgroundColor": {
+                "s.r": 0.16078431904315949,
+                "s.g": 0.2078431397676468,
+                "s.b": 0.26274511218070986,
+                "s.a": 0.5
+            },
+            "graphFont": {
+                "name": "Segoe UI",
+                "axisSize": 12.5
+            },
+            "overlayWidth": 613,
+            "upscale": true,
+            "generateStats": false,
+            "enableTargetBlocklist": true,
+            "enableAutotargetting": false,
+            "upscaleFactor": 1.75,
+            "adapterId": {
+                "nullopt": false,
+                "data": 7
+            }
+        },
+        "widgets": [
+            {
+                "index": 0,
+                "data": {
+                    "metrics": [
+                        {
+                            "metric": {
+                                "metricId": 11,
+                                "arrayIndex": 2,
+                                "deviceId": 7,
+                                "statId": 2,
+                                "desiredUnitId": 4
+                            },
+                            "lineColor": {
+                                "s.r": 0.27843138575553896,
+                                "s.g": 0.32549020648002627,
+                                "s.b": 0.3803921639919281,
+                                "s.a": 0.75
+                            },
+                            "fillColor": {
+                                "s.r": 0.3960784375667572,
+                                "s.g": 0.4431372582912445,
+                                "s.b": 0.49803921580314639,
+                                "s.a": 0.125
+                            },
+                            "axisAffinity": 0
+                        },
+                        {
+                            "metric": {
+                                "metricId": 14,
+                                "arrayIndex": 3,
+                                "deviceId": 9,
+                                "statId": 8,
+                                "desiredUnitId": 6
+                            },
+                            "lineColor": {
+                                "s.r": 0.5137255191802979,
+                                "s.g": 0.5843137502670288,
+                                "s.b": 0.615686297416687,
+                                "s.a": 0.625
+                            },
+                            "fillColor": {
+                                "s.r": 0.6392157077789307,
+                                "s.g": 0.7019608020782471,
+                                "s.b": 0.7490196228027344,
+                                "s.a": 0.375
+                            },
+                            "axisAffinity": 1
+                        }
+                    ],
+                    "height": 227,
+                    "vDivs": 7,
+                    "hDivs": 11,
+                    "showBottomAxis": false,
+                    "graphType": {
+                        "name": "Histogram",
+                        "range": {
+                            "value0": -17,
+                            "value1": 239
+                        },
+                        "rangeRight": {
+                            "value0": -31,
+                            "value1": 401
+                        },
+                        "binCount": 37,
+                        "countRange": {
+                            "value0": 5,
+                            "value1": 97
+                        },
+                        "autoLeft": true,
+                        "autoRight": false,
+                        "autoCount": true
+                    },
+                    "gridColor": {
+                        "s.r": 0.05098039284348488,
+                        "s.g": 0.11372549086809159,
+                        "s.b": 0.16862745583057404,
+                        "s.a": 0.125
+                    },
+                    "dividerColor": {
+                        "s.r": 0.23137255012989045,
+                        "s.g": 0.2862745225429535,
+                        "s.b": 0.3490196168422699,
+                        "s.a": 0.25
+                    },
+                    "backgroundColor": {
+                        "s.r": 0.40392157435417178,
+                        "s.g": 0.4274509847164154,
+                        "s.b": 0.5372549295425415,
+                        "s.a": 0.375
+                    },
+                    "borderColor": {
+                        "s.r": 0.5921568870544434,
+                        "s.g": 0.6549019813537598,
+                        "s.b": 0.7098039388656616,
+                        "s.a": 0.5
+                    },
+                    "textColor": {
+                        "s.r": 0.7568627595901489,
+                        "s.g": 0.8274509906768799,
+                        "s.b": 0.8901960849761963,
+                        "s.a": 0.875
+                    },
+                    "textSize": 14.25,
+                    "labelIncludeDeviceId": true,
+                    "labelIncludeDeviceName": false
+                }
+            },
+            {
+                "index": 1,
+                "data": {
+                    "metrics": [
+                        {
+                            "metric": {
+                                "metricId": 9,
+                                "arrayIndex": 4,
+                                "deviceId": 12,
+                                "statId": 1,
+                                "desiredUnitId": 7
+                            },
+                            "lineColor": {
+                                "s.r": 0.06666667014360428,
+                                "s.g": 0.12156862765550614,
+                                "s.b": 0.18431372940540315,
+                                "s.a": 0.5
+                            },
+                            "fillColor": {
+                                "s.r": 0.239215686917305,
+                                "s.g": 0.30980393290519717,
+                                "s.b": 0.3960784375667572,
+                                "s.a": 0.75
+                            },
+                            "axisAffinity": 1
+                        }
+                    ],
+                    "showLabel": true,
+                    "fontSize": 19.5,
+                    "fontColor": {
+                        "s.r": 0.41960784792900088,
+                        "s.g": 0.545098066329956,
+                        "s.b": 0.6784313917160034,
+                        "s.a": 0.625
+                    },
+                    "backgroundColor": {
+                        "s.r": 0.7803921699523926,
+                        "s.g": 0.8745098114013672,
+                        "s.b": 0.9843137264251709,
+                        "s.a": 0.125
+                    },
+                    "labelIncludeDeviceId": false,
+                    "labelIncludeDeviceName": true
+                }
+            }
+        ]
+    }
+}

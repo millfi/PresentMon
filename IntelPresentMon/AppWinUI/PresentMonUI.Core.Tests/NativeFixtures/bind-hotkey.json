@@ -1,0 +1,21 @@
+{
+    "header": {
+        "value0": "BindHotkey",
+        "value1": 31,
+        "value2": 0,
+        "value3": 0,
+        "value4": 0,
+        "value5": 1,
+        "value6": 1
+    },
+    "payload": {
+        "value0": {
+            "value0": 42,
+            "value1": [
+                2,
+                4
+            ]
+        },
+        "value1": 3
+    }
+}

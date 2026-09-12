@@ -1,0 +1,68 @@
+{
+    "header": {
+        "value0": "PushSpecification",
+        "value1": 19,
+        "value2": 0,
+        "value3": 0,
+        "value4": 0,
+        "value5": 1,
+        "value6": 1
+    },
+    "payload": {
+        "pid": {
+            "nullopt": true
+        },
+        "preferences": {
+            "capturePath": "C:\\Captures\\native-fixture",
+            "captureDelay": 3,
+            "enableCaptureDelay": true,
+            "captureDuration": 61,
+            "enableCaptureDuration": false,
+            "hideDuringCapture": true,
+            "hideAlways": false,
+            "enablePerMetricDeviceSelection": true,
+            "independentWindow": true,
+            "metricPollRate": 47,
+            "overlayDrawRate": 29,
+            "telemetrySamplingPeriodMs": 113,
+            "etwFlushPeriod": 17,
+            "manualEtwFlush": false,
+            "metricsOffset": 157,
+            "metricsWindow": 1021,
+            "overlayPosition": 3,
+            "timeRange": 13.5,
+            "overlayMargin": 1.25,
+            "overlayBorder": 2.5,
+            "overlayPadding": 3.75,
+            "graphMargin": 4.25,
+            "graphBorder": 5.5,
+            "graphPadding": 6.75,
+            "overlayBorderColor": {
+                "s.r": 0.04313725605607033,
+                "s.g": 0.09019608050584793,
+                "s.b": 0.14509804546833039,
+                "s.a": 0.25
+            },
+            "overlayBackgroundColor": {
+                "s.r": 0.16078431904315949,
+                "s.g": 0.2078431397676468,
+                "s.b": 0.26274511218070986,
+                "s.a": 0.5
+            },
+            "graphFont": {
+                "name": "Segoe UI",
+                "axisSize": 12.5
+            },
+            "overlayWidth": 613,
+            "upscale": true,
+            "generateStats": false,
+            "enableTargetBlocklist": true,
+            "enableAutotargetting": false,
+            "upscaleFactor": 1.75,
+            "adapterId": {
+                "nullopt": true
+            }
+        },
+        "widgets": []
+    }
+}

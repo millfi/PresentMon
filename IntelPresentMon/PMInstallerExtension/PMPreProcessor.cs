@@ -11,6 +11,9 @@ namespace pm_installer
     public class pm_wix_extension : WixExtension
     {
         private pmi_preprocessor_extension preprocessor_extension;
+        private readonly pmi_winui_binder_extension winui_binder_extension = new pmi_winui_binder_extension();
+
+        public override BinderExtension BinderExtension => winui_binder_extension;
 
         public override PreprocessorExtension
            PreprocessorExtension

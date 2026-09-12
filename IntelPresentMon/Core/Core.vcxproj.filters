@@ -9,6 +9,7 @@
     <ClInclude Include="source\win\WinAPI.h" />
     <ClInclude Include="source\win\Window.h" />
     <ClInclude Include="source\gfx\Graphics.h" />
+    <ClInclude Include="source\gfx\OptionalDebugLayer.h" />
     <ClInclude Include="source\gfx\base\InternalGeometry.h" />
     <ClInclude Include="source\gfx\layout\Element.h" />
     <ClInclude Include="source\gfx\layout\Geometry.h" />

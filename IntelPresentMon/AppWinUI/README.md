@@ -1,8 +1,8 @@
 # PresentMon WinUI interface
 
-The capture application now starts this native WinUI 3 interface instead of the
-Vue/CEF application. Start `build\Debug\PresentMon.exe`, not the UI executable
-alone, for a connected capture session. See [BUILDING.md](../../BUILDING.md) for
+The capture application starts this native WinUI 3 interface. Start
+`build\Debug\PresentMon.exe` for a connected capture session. See
+[BUILDING.md](../../BUILDING.md) for
 the complete build, service, and installer instructions.
 
 ## Structure
@@ -19,11 +19,13 @@ the complete build, service, and installer instructions.
   automatic GPU targeting.
 - `PresentMonUI.Core`: JSON models/migrations, specification construction,
   atomic persistence, and the binary named-pipe client.
+- `Assets/Presets`: the four built-in overlay loadouts.
+- `Assets/BlockLists/TargetBlockList.txt`: the default capture target filter.
 
 The native kernel still owns overlay rendering, telemetry, frame capture, and
-global hotkeys. The managed client speaks its existing cereal binary protocol;
-there is no embedded browser or JavaScript bridge. The retained `AppCef` source
-contains shared native action declarations and the four original preset files.
+global hotkeys. The managed client speaks its existing cereal binary protocol.
+The kernel build stages the presets and blocklist from this project's assets
+beside the application for runtime use and installer packaging.
 
 ## Compatibility and deployment
 
@@ -44,6 +46,14 @@ and captures. The UI displays the capture directory actually used by the native
 kernel. Launching the UI directly provides disconnected layout inspection;
 capture and editing controls require a connected kernel session.
 
+The title bar uses a Grid, icon, and caption with `Window.SetTitleBar`, following
+the [custom title bar guidance](https://learn.microsoft.com/en-us/windows/apps/develop/title-bar?tabs=winui3).
+The Windows App SDK `TitleBar` control crashed with `E_INVALIDARG` when the native
+launch tests minimized the window immediately after startup. Replacing that
+control passed both existing foreground/restore tests with their original timing
+and assertions. Removing only its icon did not fix the crash; both application
+icon assets remain in use.
+
 ## Regression checks
 
 Run a successful application build before the managed regression checks:
@@ -54,10 +64,11 @@ dotnet build IntelPresentMon\AppWinUI\PresentMonUI.Core.Tests\PresentMonUI.Core.
 dotnet run --project IntelPresentMon\AppWinUI\PresentMonUI.Core.Tests\PresentMonUI.Core.Tests.csproj --no-build
 ```
 
-The managed suite has 24 checks covering all four original presets, migrations,
-metric/device resolution, nested change tracking, atomic persistence, framing,
-cancellation, error responses, and actual native cereal fixtures. The fixture
-generator and provenance are in `PresentMonUI.Core.Tests/NativeFixtures`.
+The managed suite has 25 checks covering all four built-in presets, migrations,
+metric/device resolution, nested change tracking, atomic persistence, native
+launch arguments and unsupported options, framing, cancellation, error responses,
+and actual native cereal fixtures. The fixture generator and provenance are in
+`PresentMonUI.Core.Tests/NativeFixtures`.
 `-RunNativeTests` on the build helper additionally builds and runs the C++ suite.
 
 ## Desktop verification on 2026-09-12
@@ -86,22 +97,47 @@ Verified behavior:
 Desktop testing exposed and fixed two failures: missing optional DirectX debug
 layers now fall back to normal rendering, and ListView reordering uses data items
 instead of reparenting live XAML visuals. The C++ suite passed 270 tests afterward.
-The documented build helper also passed end-to-end. The final Debug MSI passed
+The documented build helper also passed end-to-end. Before the legacy-code and
+unused-asset cleanup, the Debug MSI passed
 all WiX ICE checks without suppression; extraction verified the sizes and SHA256
-hashes of all 540 packaged files (520 UI files) against the current build outputs.
+hashes of its 540 packaged files (520 UI files) against the build outputs at that
+time. These counts describe that earlier package.
 
-The unsigned Release build also passed all 24 managed checks and 270 native tests.
-Its desktop smoke test verified process selection, capture start/stop, 1,006 CSV
-frame records with a summary CSV, and the live FPS/frame-time overlay. The Release
-MSI passed all WiX ICE checks; all 540 packaged files matched the Release outputs
-by size and SHA256. Use `-Configuration Release -UnsignedRelease` on the build
+The earlier unsigned Release smoke test verified process selection, capture
+start/stop, 1,006 CSV frame records with a summary CSV, and the live FPS/frame-time
+overlay. Use `-Configuration Release -UnsignedRelease` on the build
 helper to reproduce the application build without a signing certificate. This
 opt-in build uses `uiAccess=false`; the default signed Release settings remain.
+
+After the legacy-code and unused-asset cleanup and custom title bar fix, Debug
+and Release application/core builds completed with zero warnings and errors.
+Each configuration passed all 25 managed checks, 270 native tests, and 19 selected
+IPC/action/UI integration tests without skips. The integration tests include the
+original duplicate-launch and minimized-window foreground/restore assertions.
+Only `AppIcon.ico` and `AppIcon.png` remain in the deployed UI assets directory;
+presets and the blocklist are staged by the native application.
+
+The final Release desktop smoke test selected the isolated D3D11 target and used
+Ctrl+Shift+K to start and stop capture, verifying the recording and idle states.
+The resulting CSV contained 813 frames with its summary CSV, and the live overlay
+showed 32.3 FPS and 31.0 ms. When the target exited normally, the UI returned to no
+application selected and idle. Manual minimize/restore and maximize/restore also
+passed with the custom title bar. Evidence is in
+`build/winui-verification/cleanup-{capture,overlay,target-lost,restored}.jpg` and
+`build/Release/Captures/pmcap-PresentMonValidationTarget.exe-260912-204442.csv`.
+
+The final unsigned Release MSI passed all WiX ICE checks without suppression.
+All 532 packaged files (512 UI files) matched the Release outputs by size and
+SHA256. The MSI is 90,401,546 bytes with SHA256
+`0A842C81F26566577485DC1AEE36C6A72E70AB6D0E81E280B2E5BD3B76D5E90F`.
 
 Remaining manual verification: the file picker opened, but the automation tool
 could not target its separate Windows PickerHost process to finish the dialog;
 loadout serialization itself is covered by the regression suite. A single
 automated drag gesture did not reorder a card, so drag-and-drop remains manually
 unverified; native reorder configuration was checked against WinUI source and
-the accessible move buttons passed the desktop test. Full Release signing and
-installation on a separate clean machine were not exercised.
+the accessible move buttons passed the desktop test. Independent Window created
+a `PresentMonDataDisplay` window, but screenshot approval timed out and the test
+target exited before its contents and placement could be verified. That option
+was restored to off. Full Release signing and installation on a separate clean
+machine were not exercised.

@@ -66,8 +66,13 @@ namespace pmon::ipc::act
 		static constexpr uint16_t Version = 1;
 	};
 
+	struct EventDeclaration
+	{
+		static constexpr uint16_t Version = 1;
+	};
+
 	template<class T, class ExecutionContext>
-	class AsyncEventActionBase_ : public AsyncAction<ExecutionContext>
+	class AsyncEventActionBase_ : public AsyncAction<ExecutionContext>, public EventDeclaration
 	{
 	public:
 		pipe::as::awaitable<void> Execute(ExecutionContext& ctx, AsyncAction<ExecutionContext>::SessionContext& stx,
@@ -89,8 +94,6 @@ namespace pmon::ipc::act
 		{
 			return T::Identifier;
 		}
-		// default version for all actions
-		static constexpr uint16_t Version = 1;
 	};
 
 	template<class P>
@@ -103,8 +106,10 @@ namespace pmon::ipc::act
 	};
 
 	template<class A>
-	concept Event = std::is_base_of_v<AsyncEventActionBase_<A, typename A::ExecutionContext>, A> && requires {
+	concept Event = std::is_base_of_v<EventDeclaration, A> && requires {
 		typename A::Params;
+		A::Identifier;
+		A::Version;
 	};
 
 	template<class Params>

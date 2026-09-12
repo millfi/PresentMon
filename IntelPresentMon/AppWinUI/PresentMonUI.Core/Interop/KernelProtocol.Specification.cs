@@ -125,7 +125,7 @@ internal static partial class KernelProtocol
         {
             if (!double.IsFinite(value))
                 throw new ArgumentOutOfRangeException(nameof(values), "Native graph range limits must be finite.");
-            // The Vue bridge used CefV8Value::GetIntValue for native integers.
+            // Native graph limits are integers; retain truncation of persisted fractional values.
             writer.Int32(checked((int)value));
         }
     }
@@ -134,7 +134,7 @@ internal static partial class KernelProtocol
     {
         if (!double.IsFinite(value) || value < 0)
             throw new ArgumentOutOfRangeException(nameof(value), "The native setting requires a finite, nonnegative value.");
-        // Preserve fractional values in JSON while matching CEF's integer conversion.
+        // Preserve fractional values in JSON and truncate at the native integer boundary.
         return checked((uint)value);
     }
 }

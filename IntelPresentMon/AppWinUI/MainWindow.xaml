@@ -13,11 +13,15 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <TitleBar x:Name="AppTitleBar" Title="Intel PresentMon">
-            <TitleBar.IconSource>
-                <ImageIconSource ImageSource="Assets/AppIcon.png" />
-            </TitleBar.IconSource>
-        </TitleBar>
+        <!-- A simple drag surface avoids the SDK TitleBar crash on early minimization. -->
+        <Grid x:Name="AppTitleBar" Height="32" Background="Transparent">
+            <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0"
+                        VerticalAlignment="Center">
+                <Image Source="Assets/AppIcon.png" Width="16" Height="16" />
+                <TextBlock Text="Intel PresentMon" VerticalAlignment="Center"
+                           Style="{ThemeResource CaptionTextBlockStyle}" />
+            </StackPanel>
+        </Grid>
 
         <NavigationView x:Name="Navigation" Grid.Row="1"
                         PaneDisplayMode="Auto" OpenPaneLength="220"

@@ -1,35 +1,36 @@
 # PresentMon Capture Application
 
-The **PresentMon Capture Application** is both an trace capture and realtime performance overlay for games and other graphics-intensive applications. It uses the [PresentMon Service](README-Service.md) to collect performance data, a custom Direct3D 11 renderer to display a realtime performance overlay, and a CEF-based UI to configure overlay and trace capture functionality.
+The **PresentMon Capture Application** records performance data and displays a realtime overlay for games and other graphics-intensive applications. Its WinUI 3 control panel configures the native capture kernel, which uses the [PresentMon Service](README-Service.md) for telemetry and a Direct3D 11 renderer for the overlay.
 
-![Architecture](IntelPresentMon/docs/images/app-cef-overlay-architecture.jpg)
+```mermaid
+flowchart LR
+    UI[WinUI 3 control panel] <-->|Named-pipe actions and events| Kernel[Native capture kernel]
+    Kernel <-->|PresentMon API| Service[PresentMon Service]
+    Target[Target application] -->|ETW events| Service
+    Kernel --> Overlay[Direct3D 11 overlay]
+    Kernel --> CSV[Frame and summary CSV files]
+```
 
 ## Usage
 
-To run the *PresentMon Capture Application*, run `PresentMon.exe`.
+To run the *PresentMon Capture Application*, run `PresentMon.exe`. It starts the WinUI control panel from `ui\PresentMonUI.exe`; keep the complete self-contained `ui` directory beside the native executable. See [BUILDING.md](BUILDING.md) for build and development launch instructions.
 
-Only severe errors are logged by default in Release configuration. To log all errors in release:
+Errors are logged by default. To include informational messages:
 
 ```text
---p2c-verbose
+--log-level info
 ```
 
-Logs and cache files are written to `%AppData%\PresentMon2Capture` by default. You can change this to the working directory of the application (convenient when launching Debug build from IDE):
+Logs are written to `%LocalAppData%\Intel\PresentMon\logs`. Preferences, loadouts, and captures use the user's Documents\PresentMon folder. To store development files under the working directory:
 
 ```text
---p2c-files-working
+--files-working
 ```
 
-Enable experimental support for tearing presents (required for Variable Refresh Rate):
+To allow tearing presents for the overlay:
 
 ```text
---p2c-allow-tearing
-```
-
-In Debug configuration, the application will halt with a modal error dialog whenever a resource is requested from a non-local (network) URL. This flag disables that behavior:
-
-```text
---p2c-no-net-fail
+--allow-tearing
 ```
 
 ## Metric and CSV Column Definitions
@@ -132,7 +133,7 @@ In Debug configuration, the application will halt with a modal error dialog when
 
 The PresentMon capture application creates two CSV files per capture. The first records the raw frame data of the capture and is named using the following pattern: "pmcap-[executablename]-YYMMDD-HHMMSS.csv".
 The second CSV file generated is a stats summary file for the capture. It includes the duration of the capture, the total number of frames captured, plus the average, minimum, maximum, 99th, 95th and
-90th FPS percentiles. The stats file is named using the following pattern: "pmcap-[executablename]-YYMMDD-HHMMSS-stats.csv". All files are stored in the user's appdata local directory in the "Intel\PresentMon\Capture" folder.
+90th FPS percentiles. The stats file is named using the following pattern: "pmcap-[executablename]-YYMMDD-HHMMSS-stats.csv". Files are stored in the Captures subfolder of Documents\PresentMon, or the working directory when `--files-working` is set. The control panel displays the active capture directory.
 
 ## Implementation
 
@@ -180,12 +181,6 @@ We have noted that an application can remain on top (even above fullscreen exclu
 
 [MSDN:Integrity Levels](https://docs.microsoft.com/en-us/previous-versions/dotnet/articles/bb625963(v=msdn.10)?redirectedfrom=MSDN)
 
-### CEF
+### WinUI 3
 
-https://bitbucket.org/chromiumembedded/cef/wiki/Home
-
-The *PresentMon Capture Application* uses the Chromium Embedded Framework (CEF) to implement the the control UI. The CEF is a C++ framework that streamlines development of custom applications with Chromium. With some minimal bootstrapping and configuring code, the framework will spin up and connect Chromium components, binding them to windows, inputs, sockets, etc. on the platform of choice.
-
-Behavior of the framework can be customized by inheriting from base class interfaces and injecting them into the framework, thus hooking various callback functions to implement your desired behavior. In particular, custom objects can be implemented in C++ and then injected into the global (window) namespace in V8 to create an interop between JS and C++ code.
-
-A major challenge when dealing with CEF is the multi-process nature of Chromium. One must be aware at all time on which process and which thread each piece of code is running on. Thread task queues and IPC message queues are used to make sure that operations are executed on the appropriate thread and process. V8 contexts must also be captured and managed when interacting with V8 state.
+The control panel uses C# and XAML with the Windows App SDK. Its managed core preserves the existing preference/loadout formats and exchanges binary actions with the native kernel over a named pipe. The kernel owns telemetry, overlay rendering, CSV capture, and global hotkeys. See [the WinUI implementation guide](IntelPresentMon/AppWinUI/README.md) for the project layout and regression checks.

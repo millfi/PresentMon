@@ -144,10 +144,6 @@ namespace p2c::win
 			if (auto i = textMap.find(t); i != textMap.end()) return i->second;
 			return nullptr;
 		}
-		const std::vector<Descriptor>& EnumerateKeys() const
-		{
-			return keyList;
-		}
 		static const Registry& Get()
 		{
 			static Registry reg{};
@@ -209,11 +205,6 @@ namespace p2c::win
 	bool Key::operator<(const Key& rhs) const
 	{
 		return code < rhs.code;
-	}
-
-	const std::vector<Key::Descriptor>& Key::EnumerateKeys()
-	{
-		return Registry::Get().EnumerateKeys();
 	}
 
 	std::optional<Key> Key::FromString(const std::string& s)

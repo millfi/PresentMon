@@ -6,8 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Services/StartupOptions.cs" Link="Services/StartupOptions.cs" />
     <ProjectReference Include="../PresentMonUI.Core/PresentMonUI.Core.csproj" />
-    <None Include="../../AppCef/ipm-ui-vue/presets/*.json" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Assets/Presets/*.json" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Update="NativeFixtures/*.bin" CopyToOutputDirectory="PreserveNewest" />
     <None Update="NativeFixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

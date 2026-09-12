@@ -185,6 +185,7 @@
     <ClInclude Include="kact\SetCapture.h" />
     <ClInclude Include="kact\SetEtlLogging.h" />
     <ClInclude Include="MakeOverlaySpec.h" />
+    <ClInclude Include="UiEvents.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
@@ -207,8 +208,8 @@
   </Target>
   <Target Name="CopyApplicationAssets" AfterTargets="Build">
     <ItemGroup>
-      <ApplicationPreset Include="$(ProjectDir)..\AppCef\ipm-ui-vue\presets\*.json" />
-      <ApplicationBlocklist Include="$(ProjectDir)..\AppCef\ipm-ui-vue\BlockLists\*.txt" />
+      <ApplicationPreset Include="$(ProjectDir)..\AppWinUI\Assets\Presets\*.json" />
+      <ApplicationBlocklist Include="$(ProjectDir)..\AppWinUI\Assets\BlockLists\*.txt" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)Presets;$(OutDir)Blocklists" />
     <Copy SourceFiles="@(ApplicationPreset)" DestinationFolder="$(OutDir)Presets" SkipUnchangedFiles="true" />

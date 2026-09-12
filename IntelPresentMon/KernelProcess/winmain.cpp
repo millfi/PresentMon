@@ -4,12 +4,8 @@
 #include "../CommonUtilities/log/IdentificationTable.h"
 #include "../Interprocess/source/act/SymmetricActionServer.h"
 #include "kact/KernelExecutionContext.h"
-#include "../AppCef/source/util/cact/TargetLostAction.h"
-#include "../AppCef/source/util/cact/OverlayDiedAction.h"
-#include "../AppCef/source/util/cact/PresentmonInitFailedAction.h"
-#include "../AppCef/source/util/cact/StalePidAction.h"
-#include "../AppCef/source/util/cact/HotkeyFiredAction.h"
-#include "../AppCef/source/util/UiProcessGuard.h"
+#include "UiEvents.h"
+#include "../Core/source/win/UiProcessGuard.h"
 #include "../PresentMonAPIWrapper/PresentMonAPIWrapper.h"
 #include "../PresentMonAPIWrapper/StaticQuery.h"
 #include "../Interprocess/source/SystemDeviceId.h"
@@ -41,27 +37,25 @@ namespace kproc
 {
 	using KernelServer = ipc::act::SymmetricActionServer<kact::KernelExecutionContext>;
 
-	namespace cact = p2c::client::util::cact;
-
 	class KernelHandler : public p2c::kern::KernelHandler
 	{
 	public:
 		KernelHandler(KernelServer& server) : server_{ server } {}
 		void OnTargetLost(uint32_t pid) override
 		{
-			server_.DispatchDetached(cact::TargetLostAction::Params{ pid });
+			server_.DispatchDetached(ui::TargetLostAction::Params{ pid });
 		}
 		void OnOverlayDied() override
 		{
-			server_.DispatchDetached(cact::OverlayDiedAction::Params{});
+			server_.DispatchDetached(ui::OverlayDiedAction::Params{});
 		}
 		void OnPresentmonInitFailed() override
 		{
-			server_.DispatchDetached(cact::PresentmonInitFailedAction::Params{});
+			server_.DispatchDetached(ui::PresentmonInitFailedAction::Params{});
 		}
 		void OnStalePidSelected() override
 		{
-			server_.DispatchDetached(cact::StalePidAction::Params{});
+			server_.DispatchDetached(ui::StalePidAction::Params{});
 		}
 	private:
 		// data
@@ -151,22 +145,22 @@ namespace kproc
 	int HandleConcurrentUiInstance_(std::string_view uiMutexName, p2c::cli::DuplicateUiResponse response)
 	{
 		if (MakeConcurrentUiInstanceAction_(response) == ConcurrentUiInstanceAction::KillPrevious) {
-			if (p2c::client::util::TerminateUiInstanceProcessTree(uiMutexName)) {
+			if (p2c::win::TerminateUiInstanceProcessTree(uiMutexName)) {
 				return 0;
 			}
 			if (response == p2c::cli::DuplicateUiResponse::No) {
 				pmlog_warn("Unable to close the previous Intel PresentMon instance");
-				return p2c::client::util::UiAlreadyRunningExitCode;
+				return p2c::win::UiAlreadyRunningExitCode;
 			}
 			MessageBoxW(nullptr,
 				L"Unable to close the previous Intel PresentMon instance.",
 				L"Intel PresentMon",
 				MB_ICONERROR | MB_APPLMODAL | MB_SETFOREGROUND);
-			return p2c::client::util::UiAlreadyRunningExitCode;
+			return p2c::win::UiAlreadyRunningExitCode;
 		}
 
-		p2c::client::util::BringUiBrowserWindowToFront(uiMutexName);
-		return p2c::client::util::UiAlreadyRunningExitCode;
+		p2c::win::BringUiWindowToFront(uiMutexName);
+		return p2c::win::UiAlreadyRunningExitCode;
 	}
 
 	class KillOnCloseJob
@@ -367,8 +361,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		if (headless) {
 			ConfigureHeadlessLogging();
 		}
-		else if (p2c::client::util::IsUiBrowserProcessActive(*opt.uiMutexName)) {
-			pmlog_warn("UI browser process already active; handling duplicate UI launch action");
+		else if (win::IsUiProcessActive(*opt.uiMutexName)) {
+			pmlog_warn("UI process already active; handling duplicate UI launch action");
 			if (const auto duplicateResult = HandleConcurrentUiInstance_(*opt.uiMutexName, *opt.duplicateUiResponse)) {
 				return duplicateResult;
 			}
@@ -428,22 +422,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			// connect to service's log pipe (best effort)
 			ConnectToLoggingSourcePipe(logSvcPipe);
 		}
-
-		//// connect to the middleware diagnostic layer (not generally used by ipm since we connect
-		//// to logging directly via copy channel in dev and log middleware to file in production)
-		//std::optional<pmapi::DiagnosticHandler> diag;
-		//try {
-		//    if (opt.enableDiagnostic && opt.cefType && *opt.cefType == "renderer") {
-		//        diag.emplace(
-		//            (PM_DIAGNOSTIC_LEVEL)opt.logLevel.AsOptional().value_or(log::GlobalPolicy::Get().GetLogLevel()),
-		//            PM_DIAGNOSTIC_OUTPUT_FLAGS_DEBUGGER | PM_DIAGNOSTIC_OUTPUT_FLAGS_QUEUE,
-		//            [](const PM_DIAGNOSTIC_MESSAGE& msg) {
-		//            auto ts = msg.pTimestamp ? msg.pTimestamp : std::string{};
-		//            pmlog_(log::Level(msg.level)).note(std::format("@@ D I A G @@ => <{}> {}", ts, msg.pText));
-		//        }
-		//        );
-		//    }
-		//} pmcatch_report;
 
 		// if we are just listing, do not launch Kernel, just use API directly here and exit
 		if (opt.subcList.Active()) {
@@ -555,7 +533,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 			actName, 1, "D:(A;;GA;;;WD)S:(ML;;NW;;;ME)", headless };
 		// set the hotkey manager to send notifications via the action server
 		hotkeys.SetHandler([&](int action) {
-			server.DispatchDetached(p2c::client::util::cact::HotkeyFiredAction::Params{ .actionId = action });
+			server.DispatchDetached(ui::HotkeyFiredAction::Params{ .actionId = action });
 		});
 		// select which handler to use for kernel async events/signals
 		auto pKernelHandler = [&]() -> std::unique_ptr<::p2c::kern::KernelHandler> {
@@ -564,7 +542,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 				return std::make_unique<HeadlessKernelHandler>();
 			}
 			else {
-				// this handler receives events from the kernel and transmits them to the render process via the server
+				// This handler transmits kernel events to the control panel.
 				return std::make_unique<KernelHandler>(server);
 			}
 		}();
@@ -575,31 +553,20 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 		// run the UI when not headless
 		if (!headless) {
 			for (;;) {
-				// Compose optional command-line arguments for the native UI.
+				// Pass only options implemented by the WinUI control panel.
 				auto args = std::vector<std::string>{
-					opt.filesWorking ? "--p2c-files-working"s : ""s,
-					opt.traceExceptions ? "--p2c-trace-exceptions"s : ""s,
-					opt.logFolder ? "--p2c-log-folder"s : ""s, *opt.logFolder,
-				} | vi::filter(std::not_fn(&std::string::empty)) | rn::to<std::vector>();
-				// forward verbose module options
-				if (opt.logVerboseModules) {
-					args.push_back("--p2c-log-verbose-modules"s);
-					args.append_range(*opt.logVerboseModules | vi::transform(util::log::GetVerboseModuleName));
-				}
-				for (auto& f : *opt.uiFlags) {
-					args.push_back("--p2c-" + f);
-				}
-				for (auto& o : *opt.uiOptions) {
-					args.push_back("--p2c-" + o.first);
-					args.push_back(o.second);
-				}
-				// add fixed CLI options to the args vector
-				args.append_range(std::vector{
-					"--p2c-log-level"s, util::log::GetLevelName(*opt.logLevel),
-					"--p2c-log-trace-level"s, util::log::GetLevelName(*opt.logTraceLevel),
 					"--p2c-ui-mutex-name"s, *opt.uiMutexName,
 					"--p2c-act-name"s, actName
-				});
+				};
+				if (opt.filesWorking) {
+					args.push_back("--p2c-files-working"s);
+				}
+				if (opt.enableUiDevOptions) {
+					args.push_back("--p2c-enable-ui-dev-options"s);
+				}
+				if (opt.logFolder) {
+					args.append_range(std::vector{ "--p2c-log-folder"s, *opt.logFolder });
+				}
 				// Launch the unpackaged WinUI application with its self-contained runtime.
 				auto uiChild = [&] {
 					// WORKAROUND: keep a relative exe name while forcing install-dir cwd for child startup.
@@ -628,7 +595,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 				// Keep the kernel alive until the control panel closes.
 				const auto uiExitCode = uiChild.wait();
-				if (uiExitCode == p2c::client::util::UiAlreadyRunningExitCode) {
+				if (uiExitCode == win::UiAlreadyRunningExitCode) {
 					pmlog_warn("UI client reported an existing instance; handling duplicate UI launch action");
 					if (const auto duplicateResult = HandleConcurrentUiInstance_(*opt.uiMutexName, *opt.duplicateUiResponse)) {
 						return duplicateResult;

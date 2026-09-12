@@ -4,8 +4,10 @@
 #include "CppUnitTest.h"
 #include "Folders.h"
 #include "TestProcess.h"
-#include "../AppCef/source/util/UiProcessGuard.h"
+#include "../Core/source/win/UiProcessGuard.h"
+#include <array>
 #include <chrono>
+#include <cstdint>
 #include <format>
 #include <future>
 #include <memory>
@@ -18,7 +20,7 @@ using namespace std::literals;
 
 namespace UiLaunchTests
 {
-	namespace ui = p2c::client::util;
+	namespace ui = p2c::win;
 
 	class TestFixture : public CommonTestFixture
 	{
@@ -59,9 +61,9 @@ namespace UiLaunchTests
 	{
 		HWND hWnd = nullptr;
 		Assert::IsTrue(WaitFor_(15s, [&] {
-			hWnd = ui::FindUiBrowserWindow(mutexSuffix);
+			hWnd = ui::FindUiWindow(mutexSuffix);
 			return hWnd != nullptr;
-		}), L"Timed out waiting for UI browser window");
+		}), L"Timed out waiting for UI window");
 		return hWnd;
 	}
 
@@ -71,11 +73,44 @@ namespace UiLaunchTests
 		Assert::AreEqual(ui::UiAlreadyRunningExitCode, process.GetExitCode());
 	}
 
+	static std::string DescribeWindow_(HWND hWnd)
+	{
+		DWORD processId = 0;
+		const auto threadId = GetWindowThreadProcessId(hWnd, &processId);
+		std::array<char, 256> title{};
+		std::array<char, 256> className{};
+		GetWindowTextA(hWnd, title.data(), (int)title.size());
+		GetClassNameA(hWnd, className.data(), (int)className.size());
+		return std::format("hwnd=0x{:X} pid={} tid={} iconic={} visible={} class='{}' title='{}'",
+			reinterpret_cast<uintptr_t>(hWnd), processId, threadId, IsIconic(hWnd) != FALSE,
+			IsWindowVisible(hWnd) != FALSE, className.data(), title.data());
+	}
+
+	static void LogUiForeground_(const char* phase, HWND hWnd)
+	{
+		const auto foreground = GetForegroundWindow();
+		const auto root = foreground ? GetAncestor(foreground, GA_ROOT) : nullptr;
+		Logger::WriteMessage(std::format("{}: expected [{}]; foreground [{}]; root [{}]\n",
+			phase, DescribeWindow_(hWnd), DescribeWindow_(foreground), DescribeWindow_(root)).c_str());
+	}
+
+	static void AssertUiForeground_(HWND hWnd)
+	{
+		const auto foreground = WaitFor_(5s, [hWnd] {
+			const auto hForeground = GetForegroundWindow();
+			const auto hRootForeground = hForeground ? GetAncestor(hForeground, GA_ROOT) : nullptr;
+			return IsIconic(hWnd) == FALSE && hRootForeground == hWnd;
+		});
+		if (!foreground) {
+			LogUiForeground_("Foreground activation failed", hWnd);
+		}
+		Assert::IsTrue(foreground, L"Existing UI window was not brought to the foreground");
+	}
+
 	static std::vector<std::string> MakeKernelArgs_(const std::string& mutexSuffix)
 	{
 		return {
 			"--ui-mutex-name"s, mutexSuffix,
-			"--ui-flag"s, "no-net-fail"s,
 		};
 	}
 
@@ -84,7 +119,6 @@ namespace UiLaunchTests
 		return {
 			"--ui-mutex-name"s, mutexSuffix,
 			"--duplicate-ui-response"s, response,
-			"--ui-flag"s, "no-net-fail"s,
 		};
 	}
 
@@ -155,6 +189,7 @@ namespace UiLaunchTests
 			Assert::IsTrue(WaitFor_(5s, [hWnd] {
 				return IsIconic(hWnd) != FALSE;
 			}), L"Timed out waiting for UI window to minimize");
+			LogUiForeground_("After minimizing", hWnd);
 
 			auto second = fixture_.LaunchKernel({
 				"--ui-mutex-name"s, mutexSuffix,
@@ -163,11 +198,7 @@ namespace UiLaunchTests
 			AssertUiAlreadyRunningExit_(second);
 			Assert::IsTrue(first.IsRunning(), L"Original kernel process should remain active");
 
-			Assert::IsTrue(WaitFor_(5s, [hWnd] {
-				const auto hForeground = GetForegroundWindow();
-				const auto hRootForeground = hForeground ? GetAncestor(hForeground, GA_ROOT) : nullptr;
-				return IsIconic(hWnd) == FALSE && hRootForeground == hWnd;
-			}), L"Existing UI window was not brought to the foreground");
+			AssertUiForeground_(hWnd);
 
 			TerminateUiInstanceAndWait_(mutexSuffix, first);
 		}
@@ -197,6 +228,7 @@ namespace UiLaunchTests
 			Assert::IsTrue(WaitFor_(5s, [hWnd] {
 				return IsIconic(hWnd) != FALSE;
 			}), L"Timed out waiting for UI window to minimize");
+			LogUiForeground_("After minimizing", hWnd);
 
 			auto duplicates = LaunchSimultaneousDuplicateKernels_(fixture_, mutexSuffix, "yes"s);
 			for (auto& duplicate : duplicates) {
@@ -204,11 +236,7 @@ namespace UiLaunchTests
 			}
 			Assert::IsTrue(first.IsRunning(), L"Original kernel process should remain active");
 
-			Assert::IsTrue(WaitFor_(5s, [hWnd] {
-				const auto hForeground = GetForegroundWindow();
-				const auto hRootForeground = hForeground ? GetAncestor(hForeground, GA_ROOT) : nullptr;
-				return IsIconic(hWnd) == FALSE && hRootForeground == hWnd;
-			}), L"Existing UI window was not brought to the foreground");
+			AssertUiForeground_(hWnd);
 
 			TerminateUiInstanceAndWait_(mutexSuffix, first);
 		}
@@ -223,7 +251,7 @@ namespace UiLaunchTests
 
 			Assert::IsTrue(first.WaitForExit(5s), L"Original kernel process was not terminated");
 			Assert::IsTrue(WaitFor_(15s, [&] {
-				return ui::FindUiBrowserWindow(mutexSuffix) != nullptr &&
+				return ui::FindUiWindow(mutexSuffix) != nullptr &&
 					CountRunningProcesses_(duplicates) == 1;
 			}), L"Replacement launches did not settle to one active UI instance");
 

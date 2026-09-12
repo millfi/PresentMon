@@ -11,6 +11,7 @@
 #include <Core/source/gfx/layout/style/StyleProcessor.h>
 #include <Core/source/win/StandardWindow.h>
 #include <Core/source/win/OverlayWindow.h>
+#include <Core/source/win/UiProcessGuard.h>
 #include <Core/source/cli/CliOptions.h>
 #include <Core/source/infra/util/FolderResolver.h>
 #include <ranges>
@@ -187,15 +188,12 @@ namespace p2c::kern
         UpdateTargetFullscreenStatus();
         std::unique_ptr<win::KernelWindow> pWindow;
         if (pSpec->independentKernelWindow) {
-            // try and get the position of the control (CEF) window for calculating independent metrics window pos
-            // TODO: connect this more assuredly to the cef control window
-            // tried CefBrowserHost::GetWindowHandle, but it causes crashes for some unknown reason
-            // should make this at least less brittle with respect to window classname / title
+            // Position a new independent metrics window beside this instance's control window.
             bool bringToFrontOnCreation = false;
             if (!pos_) {
                 bringToFrontOnCreation = true;
                 pos_ = Vec2I{ CW_USEDEFAULT, CW_USEDEFAULT };
-                if (auto hWndControl = FindWindowA("BrowserWindowClass", "Intel PresentMon")) {
+                if (auto hWndControl = win::FindUiWindow(*cli::Options::Get().uiMutexName)) {
                     RECT controlRect{};
                     if (GetWindowRect(hWndControl, &controlRect)) {
                         pos_ = Vec2I{ controlRect.left + 25, controlRect.top + 25 };

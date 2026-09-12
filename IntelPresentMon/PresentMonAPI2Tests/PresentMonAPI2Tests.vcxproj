@@ -115,9 +115,6 @@
     <ClCompile Include="UiLaunchTests.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AppCef\CefNano.vcxproj">
-      <Project>{3c80b001-e165-4e0e-a92d-5767cf4fb1f8}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\CommonUtilities\CommonUtilities.vcxproj">
       <Project>{08a704d8-ca1c-45e9-8ede-542a1a43b53e}</Project>
     </ProjectReference>

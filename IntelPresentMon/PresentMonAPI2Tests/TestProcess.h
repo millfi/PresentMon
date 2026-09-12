@@ -316,31 +316,6 @@ private:
 	}
 };
 
-// PresentMonUI child process used for UI process guard coverage
-class UiProcess : public TestProcess
-{
-public:
-	UiProcess(as::io_context& ioctx, JobManager& jm, const std::vector<std::string>& customArgs,
-		const CommonProcessArgs& common)
-		:
-		TestProcess{ ioctx, jm, "PresentMonUI.exe"s, MakeArgs_(customArgs, common) }
-	{}
-private:
-	std::vector<std::string> MakeArgs_(const std::vector<std::string>& customArgs,
-		const CommonProcessArgs& common)
-	{
-		std::vector<std::string> allArgs{
-			"--p2c-log-folder"s, common.logFolder,
-			"--p2c-log-level"s, common.logLevel,
-			"--p2c-url"s, "about:blank"s,
-			"--p2c-no-net-fail"s,
-		};
-		AppendVerboseModulesArgs_(allArgs, common.logVerboseModules, "--p2c-log-verbose-modules");
-		allArgs.append_range(customArgs);
-		return allArgs;
-	}
-};
-
 // PresentMon kernel process used to verify second launch behavior before UI spawn
 class KernelProcess : public TestProcess
 {
@@ -361,7 +336,6 @@ private:
 			"--control-pipe"s, common.ctrlPipe,
 			"--shm-name-prefix"s, common.shmNamePrefix,
 			"--middleware-dll-path"s, "PresentMonAPI2.dll"s,
-			"--ui-option"s, "url"s, "about:blank"s,
 		};
 		AppendVerboseModulesArgs_(allArgs, common.logVerboseModules, "--log-verbose-modules");
 		allArgs.append_range(customArgs);
@@ -442,14 +416,6 @@ public:
 	OpmProcess LaunchOpm(const std::vector<std::string>& args = {})
 	{
 		return OpmProcess{ ioctx_, jobMan_, args };
-	}
-	UiProcess LaunchUi(const std::vector<std::string>& args = {})
-	{
-		return UiProcess{ ioctx_, jobMan_, args, GetCommonArgs() };
-	}
-	std::unique_ptr<UiProcess> LaunchUiAsPtr(const std::vector<std::string>& args = {})
-	{
-		return std::make_unique<UiProcess>(ioctx_, jobMan_, args, GetCommonArgs());
 	}
 	KernelProcess LaunchKernel(const std::vector<std::string>& args = {})
 	{

@@ -138,7 +138,6 @@ namespace p2c::win
 		bool IsModifierKey() const;
 		bool operator==(const Key& rhs) const;
 		bool operator<(const Key& rhs) const;
-		static const std::vector<Descriptor>& EnumerateKeys();
 		static std::optional<Key> FromString(const std::string& s);
 		static std::optional<Key> FromPlatformCode(uint32_t p);
 		// size required for an array to hold a direct lookup table for all virtual keys

@@ -37,7 +37,7 @@ void Reject(Action action)
     throw new InvalidOperationException("Expected invalid configuration to be rejected.");
 }
 
-Test("Existing four Vue presets round-trip without losing widgets or runtime fields", () =>
+Test("Four built-in presets round-trip without losing widgets or runtime fields", () =>
 {
     int[] expectedWidgets = [4, 7, 8, 5];
     int[] expectedMetrics = [4, 10, 14, 7];
@@ -86,7 +86,7 @@ Test("Preference migrations convert legacy timing and remove flash injection", (
     var file = PreferenceDocument.Parse(root.ToJsonString(), intro);
     Assert(file.Preferences.MetricPollRate == 50 && file.Preferences.OverlayDrawRate == 10, "Legacy timing failed.");
     Assert(file.Preferences.MetricsOffset == 150 && file.Preferences.ManualEtwFlush, "ETW defaults failed.");
-    Assert(file.Preferences.CaptureDuration == 12.5, "Vue numeric strings must migrate.");
+    Assert(file.Preferences.CaptureDuration == 12.5, "Legacy numeric strings must migrate.");
     Assert(!PreferenceDocument.Serialize(file).Contains("flashInjection", StringComparison.Ordinal), "Removed injection settings survived.");
 });
 
@@ -211,4 +211,5 @@ Test("Atomic persistence retains corrupt originals and last valid backup", () =>
 });
 
 passed += await KernelProtocolTests.RunAsync();
+passed += StartupOptionsTests.Run();
 Console.WriteLine($"All {passed} regression checks passed.");

@@ -252,9 +252,8 @@ public sealed class SettingsView : UserControl
         var runtime = new TextBlock { Text = "WinUI 3 / Windows App SDK", IsTextSelectionEnabled = true, TextWrapping = TextWrapping.Wrap };
         FormControls.Identify(runtime, "AboutInterface", "Interface: WinUI 3 / Windows App SDK");
         layout.Children.Add(FormControls.Row("Interface", "Native Windows controls with keyboard and screen reader support.", runtime));
-        var entries = appInfo.Where(entry => !entry.Key.Contains("cef", StringComparison.OrdinalIgnoreCase)
-                && !entry.Key.Contains("chromium", StringComparison.OrdinalIgnoreCase))
-            .GroupBy(entry => AboutGroup(entry.Key)).ToDictionary(group => group.Key, group => group.ToArray());
+        var entries = appInfo.GroupBy(entry => AboutGroup(entry.Key))
+            .ToDictionary(group => group.Key, group => group.ToArray());
         foreach (var group in new[] { "Application", "Build", "Service", "Runtime" })
         {
             if (!entries.TryGetValue(group, out var rows)) continue;
@@ -267,7 +266,7 @@ public sealed class SettingsView : UserControl
                     IsTextSelectionEnabled = true,
                     TextWrapping = TextWrapping.Wrap,
                 };
-                var label = AboutLabel(entry.Key);
+                var label = entry.Key;
                 FormControls.Identify(value, "About" + Regex.Replace(entry.Key, "[^a-zA-Z0-9]", ""), label + ": " + value.Text);
                 layout.Children.Add(FormControls.Row(label, "", value));
             }
@@ -292,29 +291,6 @@ public sealed class SettingsView : UserControl
         if (new[] { "runtime", "sdk", "msvc", "crt", "framework", "architecture", "windows" }
             .Any(word => key.Contains(word, StringComparison.OrdinalIgnoreCase))) return "Runtime";
         return "Application";
-    }
-
-    private static string AboutLabel(string key)
-    {
-        if (key.Contains(' ')) return key;
-        return key switch
-        {
-            "productName" => "Product",
-            "productVersion" => "Product version",
-            "apiVersion" => "API version",
-            "middlewareApiVersion" => "Middleware API version",
-            "devModeEnabled" => "Developer mode",
-            "debugBlocklistEnabled" => "Debug blocklist",
-            "buildHash" => "Git hash",
-            "buildHashShort" => "Short hash",
-            "buildDateTime" => "Build date and time",
-            "buildDirty" => "Dirty build",
-            "msvcVersion" => "MSVC version",
-            "winSdkVersion" => "Windows SDK",
-            "crtVersion" => "CRT version",
-            "crtRuntime" => "CRT runtime",
-            _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Regex.Replace(key, "([a-z0-9])([A-Z])", "$1 $2")),
-        };
     }
 
     private void AddToggle(string id, string title, string description, bool value, Action<bool> setter) =>

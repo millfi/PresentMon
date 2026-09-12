@@ -16,7 +16,7 @@
     },
     {
       "path": "IntelPresentMon/KernelProcess/kact/OpenSession.h",
-      "sha256": "605AC1721A6EAA8EC877C8DB928F95CD19A41970FF2207014F10FC7B8C751002"
+      "sha256": "9374F6BA4DBAA241163BBDEADB336D8E1B6D8071FB9EB42382A80C423B9E98E8"
     },
     {
       "path": "IntelPresentMon/KernelProcess/kact/BindHotkey.h",

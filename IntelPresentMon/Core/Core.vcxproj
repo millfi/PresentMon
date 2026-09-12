@@ -82,7 +82,6 @@
     <ClInclude Include="source\kernel\WindowMoveHandler.h" />
     <ClInclude Include="source\win\EventHookHandler.h" />
     <ClInclude Include="source\win\EventHookManager.h" />
-    <ClInclude Include="source\win\GpuUtilization.h" />
     <ClInclude Include="source\win\HotkeyListener.h" />
     <ClInclude Include="source\win\KernelWindow.h" />
     <ClInclude Include="source\win\Key.h" />
@@ -92,6 +91,7 @@
     <ClInclude Include="source\win\OverlayWindow.h" />
     <ClInclude Include="source\win\ProcessMapBuilder.h" />
     <ClInclude Include="source\win\StandardWindow.h" />
+    <ClInclude Include="source\win\UiProcessGuard.h" />
     <ClInclude Include="source\win\Util.h" />
     <ClInclude Include="source\win\WinAPI.h" />
     <ClInclude Include="source\win\Window.h" />
@@ -140,7 +140,6 @@
     <ClCompile Include="source\kernel\Overlay.cpp" />
     <ClCompile Include="source\kernel\WindowMoveHandler.cpp" />
     <ClCompile Include="source\win\EventHookManager.cpp" />
-    <ClCompile Include="source\win\GpuUtilization.cpp" />
     <ClCompile Include="source\win\HotkeyListener.cpp" />
     <ClCompile Include="source\win\Key.cpp" />
     <ClCompile Include="source\win\MessageBox.cpp" />

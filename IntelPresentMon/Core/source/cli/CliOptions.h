@@ -61,10 +61,9 @@ namespace p2c::cli
 		Flag logSynchronous{ this, "--log-synchronous", "Enable synchronous logging (submit waits for processing and flush)" };
 		Option<std::vector<log::V>> logVerboseModules{ this, "--log-verbose-modules", {}, "Verbose logging modules to enable", logVmodTf_ };
 
-	private: Group gu_{ this, "CEF UI", "Options to pass thru to the CEF UI system" }; public:
-		Option<std::vector<std::pair<std::string, std::string>>> uiOptions{ this, "--ui-option", {}, "Parameterized options to pass to UI process (omit --p2c- prefix)" };
-		Option<std::vector<std::string>> uiFlags{ this, "--ui-flag", {}, "Parameterized options to pass to UI process (omit --p2c- prefix)" };
-		Option<std::string> uiMutexName{ this, "--ui-mutex-name", "UiBrowserProcess", "Suffix for the UI browser process mutex name" };
+	private: Group gu_{ this, "UI", "Options for the WinUI control panel" }; public:
+		Flag enableUiDevOptions{ this, "--enable-ui-dev-options", "Enable development controls in the UI" };
+		Option<std::string> uiMutexName{ this, "--ui-mutex-name", "UiBrowserProcess", "Suffix for the UI process mutex name" };
 		Option<DuplicateUiResponse> duplicateUiResponse{ this, "--duplicate-ui-response", DuplicateUiResponse::Ask,
 			"Automatic response for duplicate UI prompt: ask, yes, or no", duplicateUiResponseTf_ };
 

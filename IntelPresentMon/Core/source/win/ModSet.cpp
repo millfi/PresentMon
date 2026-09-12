@@ -36,10 +36,6 @@ namespace p2c::win
 			if (auto i = textMap.find(t); i != textMap.end()) return i->second;
 			return nullptr;
 		}
-		const std::vector<Descriptor>& EnumerateMods() const
-		{
-			return modList;
-		}
 		static const Registry& Get()
 		{
 			static Registry reg{};
@@ -134,11 +130,6 @@ namespace p2c::win
 			return ModSet{ pDesc->code };
 		}
 		return {};
-	}
-
-	std::vector<ModSet::Descriptor> ModSet::EnumerateMods()
-	{
-		return Registry::Get().EnumerateMods();
 	}
 
 	ModSet ModSet::FromCodes(const std::vector<uint32_t>& codes)

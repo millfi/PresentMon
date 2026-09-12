@@ -6,6 +6,7 @@
     <ClInclude Include="source\win\MessageMap.h" />
     <ClInclude Include="source\win\OverlayWindow.h" />
     <ClInclude Include="source\win\StandardWindow.h" />
+    <ClInclude Include="source\win\UiProcessGuard.h" />
     <ClInclude Include="source\win\WinAPI.h" />
     <ClInclude Include="source\win\Window.h" />
     <ClInclude Include="source\gfx\Graphics.h" />
@@ -73,7 +74,6 @@
     <ClInclude Include="source\kernel\WindowSpawnHandler.h" />
     <ClInclude Include="source\win\KernelWindow.h" />
     <ClInclude Include="source\pmon\StatisticsTracker.h" />
-    <ClInclude Include="source\win\GpuUtilization.h" />
     <ClInclude Include="source\pmon\metric\DynamicPollingFetcher.h" />
     <ClInclude Include="source\pmon\DynamicQuery.h" />
     <ClInclude Include="source\kernel\DataFetchPack.h" />
@@ -136,7 +136,6 @@
     <ClCompile Include="source\kernel\OverlayContainer.cpp" />
     <ClCompile Include="source\kernel\WindowSpawnHandler.cpp" />
     <ClCompile Include="source\pmon\StatisticsTracker.cpp" />
-    <ClCompile Include="source\win\GpuUtilization.cpp" />
     <ClCompile Include="source\pmon\DynamicQuery.cpp" />
     <ClCompile Include="source\pmon\metric\DynamicPollingFetcher.cpp" />
     <ClCompile Include="source\infra\LogSetup.cpp" />

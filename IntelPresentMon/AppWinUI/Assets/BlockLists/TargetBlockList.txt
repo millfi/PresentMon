@@ -8,7 +8,6 @@ alotinstaller.exe
 amd ryzen master.exe
 anydesk.exe
 aoruslcdservice.exe
-appcef.exe
 apphelpercap.exe
 applicationframehost.exe
 applicationframehost.exe

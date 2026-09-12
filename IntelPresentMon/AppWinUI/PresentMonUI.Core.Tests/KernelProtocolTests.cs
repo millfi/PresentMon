@@ -46,7 +46,7 @@ public static class KernelProtocolTests
         var fractionalReader = new CerealReader(fractionalWriter.ToArray());
         Equal(true, fractionalReader.Bool(), "null target marker");
         Equal("", fractionalReader.String(), "capture path");
-        Equal(12u, fractionalReader.UInt32(), "fractional integer setting matches the CEF bridge");
+        Equal(12u, fractionalReader.UInt32(), "fractional integer setting truncates at the native boundary");
     }
 
     private static async Task PacketFramingAsync()
@@ -82,7 +82,7 @@ public static class KernelProtocolTests
             Equal(42u, bind.Payload.UInt32(), "hotkey uses project key code");
             var modifiers = bind.Payload.List(bind.Payload.UInt32, 4);
             Equal("2,4", string.Join(',', modifiers), "hotkey modifiers");
-            Equal(0, bind.Payload.Int32(), "Vue hotkey action ID");
+            Equal(0, bind.Payload.Int32(), "capture hotkey action ID");
             bind.Payload.RequireEnd();
             await server.ReplyAsync(bind);
 

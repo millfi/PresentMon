@@ -75,8 +75,8 @@ public sealed record StartupOptions
                 case "--data-directory":
                     dataDirectory = ReadValue();
                     break;
-                // The kernel also forwards legacy CEF and logging switches.
-                // Unrecognized arguments are intentionally ignored, as in CEF.
+                default:
+                    throw new ArgumentException($"The {name} option is not supported by the WinUI interface.", nameof(args));
             }
         }
 

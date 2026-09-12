@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace PresentMon.UI.Core;
 
-/// <summary>Reads the existing Vue preference and loadout files, and saves them atomically.</summary>
+/// <summary>Reads supported preference and loadout files, and saves them atomically.</summary>
 public sealed class ConfigurationStore
 {
     private readonly object saveLock = new();

@@ -9,7 +9,7 @@
         UpgradeCode="CD0D489E-0FE7-452D-90D9-F94F3F5FF410">
 
         <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64"/>
-        <Icon Id="PresentMonArpIcon.ico" SourceFile="..\AppCef\flask.ico" />
+        <Icon Id="PresentMonArpIcon.ico" SourceFile="..\KernelProcess\flask.ico" />
 
         <!-- Handle in-use files by scheduling for reboot (user will see FilesInUse dialog) -->
         <Property Id="ARPPRODUCTICON" Value="PresentMonArpIcon.ico" />

@@ -32,7 +32,7 @@ you only need Visual Studio.  Ignore the other build and source dependency instr
 
     Use `-SkipAuxiliaryData` when the ETL regression data is not needed. See [auxiliary test data](Tests/auxdata.md) for the full regression fixtures.
 
-    The capture application no longer builds or ships Chromium, Vue, or npm dependencies. The old `AppCef` implementation remains in the source tree for reference, including the shared action contracts and bundled preset data.
+    The capture application uses WinUI 3. Its bundled presets and blocklist are in `IntelPresentMon\AppWinUI\Assets`; the native kernel stages these assets alongside the executable.
 
 2. Create and install a trusted test certificate. This is required for the default signed Release build. The opt-in unsigned Release workflow below does not require a certificate. For the signed workflow, open a command shell as administrator and run the following:
 

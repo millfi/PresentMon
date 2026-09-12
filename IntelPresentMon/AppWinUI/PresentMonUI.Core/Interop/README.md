@@ -31,7 +31,7 @@ failure notifications. Dispose the client during application shutdown.
 - Specifications serialize only native fields, preserving the exact order in
   `KernelProcess/kact/PushSpecification.h`. RGB byte values are normalized to
   float components; alpha is already normalized. Native integer fields truncate
-  fractional persisted settings as the existing CEF bridge did.
+  fractional persisted settings to preserve configuration compatibility.
 - Introspection follows `KernelProcess/kact/Introspect.h`, including
   `defaultAdapterId` between `systemDeviceId` and `metricAvailabilityReasons`.
   `Unit` currently has no serialized fields.
@@ -50,7 +50,7 @@ Requests are `OpenSession`, `Introspect`, `PushSpecification`, `BindHotkey`,
 `TargetLostAction`, `PresentmonInitFailedAction`, `OverlayDiedAction` and
 `StalePidAction`.
 
-Hotkey action IDs follow the existing Vue UI: 0 toggle capture, 1 toggle overlay,
+Hotkey action IDs are 0 toggle capture, 1 toggle overlay,
 2 cycle preset and 3 toggle ETL logging. Key codes are the project's `Key::Code`
 enumeration, not Windows virtual-key codes. Modifier codes are Alt 1, Ctrl 2,
 Shift 4 and Windows 8.

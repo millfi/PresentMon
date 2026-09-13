@@ -141,10 +141,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AppWinUI\PresentMonUI.csproj" Condition="'$(SkipNativeGuiBuild)'!='true'">
+    <ProjectReference Include="..\AppWinUICpp\PresentMonUI.vcxproj" Condition="'$(SkipNativeGuiBuild)'!='true'">
       <Project>{3c80b001-e165-4e0e-a92d-5767cf4fb1f8}</Project>
       <SetPlatform>Platform=x64</SetPlatform>
-      <AdditionalProperties>RuntimeIdentifier=win-x64</AdditionalProperties>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
       <Private>false</Private>
@@ -211,8 +210,8 @@
   </Target>
   <Target Name="CopyApplicationAssets" AfterTargets="Build">
     <ItemGroup>
-      <ApplicationPreset Include="$(ProjectDir)..\AppWinUI\Assets\Presets\*.json" />
-      <ApplicationBlocklist Include="$(ProjectDir)..\AppWinUI\Assets\BlockLists\*.txt" />
+      <ApplicationPreset Include="$(ProjectDir)..\AppWinUICpp\Assets\Presets\*.json" />
+      <ApplicationBlocklist Include="$(ProjectDir)..\AppWinUICpp\Assets\BlockLists\*.txt" />
     </ItemGroup>
     <MakeDir Directories="$(OutDir)Presets;$(OutDir)Blocklists" />
     <Copy SourceFiles="@(ApplicationPreset)" DestinationFolder="$(OutDir)Presets" SkipUnchangedFiles="true" />

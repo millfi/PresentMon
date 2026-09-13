@@ -14,6 +14,10 @@ PresentMon/nul
 # vcpkg dependencies
 /vcpkg_installed/
 
+# Retired managed GUI local publish profiles and build artifacts
+/IntelPresentMon/AppWinUI/
+/IntelPresentMon/AppWinUI.Tests/
+
 # User-specific files
 *.suo
 *.user

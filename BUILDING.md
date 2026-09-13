@@ -2,9 +2,9 @@
 
 ## Install Build Tool Dependencies
 
-- Visual Studio 2022 or newer with Desktop development with C++, the Windows 10/11 SDK, and C++ test tools
+- Visual Studio 2026 18.7 or newer with Desktop development with C++, Windows SDK 10.0.26100, and C++ test tools. The native WinUI package references require this toolchain; the current validated installation is Visual Studio 2026 18.9.
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) and Windows SDK 10.0.26100 for the WinUI application
+- Windows App SDK build prerequisites are restored through the native project's PackageReference entries.
 
 - [vcpkg](https://github.com/microsoft/vcpkg)
 
@@ -28,11 +28,11 @@ you only need Visual Studio.  Ignore the other build and source dependency instr
     The bootstrap script:
 
     - Pulls the pinned auxiliary test data.
-    - Restores NuGet packages for the unpackaged WinUI 3 application.
+    - Restores NuGet packages for the unpackaged native WinUI 3 application.
 
     Use `-SkipAuxiliaryData` when the ETL regression data is not needed. See [auxiliary test data](Tests/auxdata.md) for the full regression fixtures.
 
-    The capture application uses WinUI 3. Its bundled presets and blocklist are in `IntelPresentMon\AppWinUI\Assets`; the native kernel stages these assets alongside the executable.
+    The capture application uses WinUI 3. Its bundled presets and blocklist are in `IntelPresentMon\AppWinUICpp\Assets`; the native kernel stages these assets alongside the executable.
 
 2. Create and install a trusted test certificate. This is required for the default signed Release build. The opt-in unsigned Release workflow below does not require a certificate. For the signed workflow, open a command shell as administrator and run the following:
 
@@ -49,7 +49,13 @@ For a complete local capture application without building the MSI, run:
 > .\Tools\build-capture-app.ps1 -Configuration Debug -RunNativeTests
 ```
 
-This discovers Visual Studio and its bundled vcpkg (or uses `VCPKG_ROOT`), restores the pinned native dependencies, builds the WinUI application, native capture kernel, service, and middleware, then builds and runs the native unit tests. Dependency build files stay under `build\vcpkg-cache` and `vcpkg_installed`; vcpkg may also use its standard user registry and binary caches. Use `-SkipRestore` on subsequent builds. `-VisualStudioPath`, `-VcpkgRoot`, and `-PlatformToolset` select explicit tool installations. The script selects v145 for Visual Studio 2026 and v143 for Visual Studio 2022. No global vcpkg integration is required by this script.
+This discovers Visual Studio and its bundled vcpkg (or uses `VCPKG_ROOT`), restores the pinned native dependencies and the native WinUI package references, builds the WinUI application, capture kernel, service, and middleware, then builds and runs the native unit tests. Dependency build files stay under `build\vcpkg-cache` and `vcpkg_installed`; vcpkg may also use its standard user registry and binary caches. Use `-SkipRestore` on subsequent builds. `-VisualStudioPath`, `-VcpkgRoot`, and `-PlatformToolset` select explicit tool installations. The native UI requires the v145 toolset from Visual Studio 2026. No global vcpkg integration is required by this script.
+
+`-RunNativeTests` also builds `PresentMonAPI2Tests` and runs only the
+`UiProcessGuardTests` class. These checks verify foregrounding an existing
+minimized UI, replacing an existing UI, and the corresponding concurrent-launch
+cases. They run against the staged native `ui` payload; broader service and API
+integration scenarios in that project are not selected by the capture helper.
 
 For an optimized local Release build without certificate setup or signing, explicitly opt in:
 
@@ -65,19 +71,19 @@ For the full solution, including the installer in Release, enable vcpkg MSBuild 
 > msbuild /p:Platform=x64,Configuration=Release PresentMon.sln
 ```
 
-With Visual Studio 2026, add `/p:PlatformToolset=v145` when the v143 toolset is not installed.
+Build the native WinUI project with the Visual Studio 2026 v145 toolset.
 
-Restore the WinUI project first with `bootstrap.ps1`. The `Client/PresentMonUI` project produces an unpackaged, self-contained .NET and Windows App SDK deployment under `build\Debug\ui` or `build\Release\ui`. The complete `ui` directory must stay next to `PresentMon.exe`; copying its executable alone is insufficient. The MSI harvests this directory, including native runtime libraries and localized XAML resources. Overlay shaders, presets, and blocklists are staged by `KernelProcess` into the parent build directory.
+Restore the native WinUI project first with `bootstrap.ps1`. `IntelPresentMon\AppWinUICpp\PresentMonUI.vcxproj` produces an unpackaged, x64 Windows App SDK deployment under `build\Debug\ui` or `build\Release\ui`. The complete `ui` directory must stay next to `PresentMon.exe`; copying its executable alone is insufficient. The MSI harvests the native application, Windows App SDK runtime libraries, resources, and localized XAML resources. The UI payload does not require a .NET runtime. Overlay shaders, presets, and blocklists are staged by `KernelProcess` into the parent build directory.
 
 To iterate on the UI alone:
 
 ```powershell
-> dotnet build IntelPresentMon\AppWinUI\PresentMonUI.csproj -c Debug -p:Platform=x64
+> .\Tools\build-ui-cpp.ps1 -Configuration Debug
 ```
 
-When directly building `KernelProcess.vcxproj`, `/p:SkipNativeGuiBuild=true` skips its WinUI build dependency. Use this only when the UI output is already staged or when testing headless commands. `Release-EDSS` uses the Release WinUI payload.
+Pass `-RunTests` to `build-ui-cpp.ps1` to run native core and protocol checks, backdrop smoke, shell smoke, and installer-harvest validators. When directly building `KernelProcess.vcxproj`, `/p:SkipNativeGuiBuild=true` skips its WinUI build dependency. Use this only when the UI output is already staged or when testing headless commands. `Release-EDSS` uses the Release WinUI payload.
 
-Installer regression checks are in `IntelPresentMon\PMInstaller\test-winui-harvest.ps1` and `test-winui-language-metadata.ps1`. The latter takes `-WixDirectory` (the directory containing `wix.dll`) and `-ExtensionPath` (the built `PMInstallerExtension.dll`). The installer extension normalizes only eight Windows App SDK language metadata entries that WiX 3 cannot represent; the runtime files themselves remain unchanged and MSI validation stays enabled.
+Installer regression checks are in `IntelPresentMon\PMInstaller\test-winui-harvest.ps1` and `test-winui-language-metadata.ps1`. The harvest test verifies the native x64 executable, Windows App SDK XAML runtime, resources, and absence of managed runtime files. The language metadata test takes `-WixDirectory` (the directory containing `wix.dll`) and `-ExtensionPath` (the built `PMInstallerExtension.dll`). The installer extension normalizes only eight Windows App SDK language metadata entries that WiX 3 cannot represent; the runtime files themselves remain unchanged and MSI validation stays enabled.
 
 ## Running PresentMon
 

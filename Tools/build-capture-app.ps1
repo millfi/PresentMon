@@ -15,7 +15,7 @@ if ($UnsignedRelease -and $Configuration -ne "Release") {
     throw "Use -UnsignedRelease only with -Configuration Release."
 }
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$managedConfiguration = if ($Configuration -eq "Debug") { "Debug" } else { "Release" }
+$nativeConfiguration = if ($Configuration -eq "Debug") { "Debug" } else { "Release" }
 $originalLocation = Get-Location
 $originalVisualStudioPath = $env:VCPKG_VISUAL_STUDIO_PATH
 $originalModulePath = $env:PSModulePath
@@ -53,17 +53,28 @@ try {
     $env:VCPKG_VISUAL_STUDIO_PATH = $VisualStudioPath
     $installedDir = Join-Path $repoRoot "vcpkg_installed"
     $cacheDir = Join-Path $repoRoot "build\vcpkg-cache"
-    $uiProject = Join-Path $repoRoot "IntelPresentMon\AppWinUI\PresentMonUI.csproj"
-
     if (-not $SkipRestore) {
         Invoke-Checked $vcpkg @(
             "install", "--triplet", "x64-windows-static", "--host-triplet", "x64-windows-static",
             "--x-install-root=$installedDir", "--x-buildtrees-root=$cacheDir\buildtrees",
             "--x-packages-root=$cacheDir\packages", "--downloads-root=$cacheDir\downloads"
         )
-        Invoke-Checked "dotnet" @("restore", $uiProject, "-p:Platform=x64", "-p:RuntimeIdentifier=win-x64")
     }
-    Invoke-Checked "dotnet" @("build", $uiProject, "--no-restore", "-c", $managedConfiguration, "-p:Platform=x64", "-p:RuntimeIdentifier=win-x64")
+    $uiBuildParameters = @{
+        Configuration = $nativeConfiguration
+        VisualStudioPath = $VisualStudioPath
+        PlatformToolset = $PlatformToolset
+    }
+    if ($SkipRestore) {
+        $uiBuildParameters.SkipRestore = $true
+    }
+    if ($RunNativeTests) {
+        $uiBuildParameters.RunTests = $true
+    }
+    & (Join-Path $repoRoot "Tools\build-ui-cpp.ps1") @uiBuildParameters
+    if ($LASTEXITCODE -ne 0) {
+        throw "The native WinUI application build failed with exit code $LASTEXITCODE."
+    }
 
     # Native pre-build steps use Windows PowerShell, including when this script runs in PowerShell 7.
     $env:PSModulePath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\Modules;$env:ProgramFiles\WindowsPowerShell\Modules"
@@ -71,7 +82,7 @@ try {
     Remove-Item Env:PATH -ErrorAction SilentlyContinue
     $env:Path = $originalExecutablePath
     $nativeArguments = @(
-        "/m:4", "/nr:false", "/nologo", "/verbosity:minimal", "/p:CL_MPCount=4", "/p:Configuration=$managedConfiguration", "/p:Platform=x64",
+        "/m:4", "/nr:false", "/nologo", "/verbosity:minimal", "/p:CL_MPCount=4", "/p:Configuration=$nativeConfiguration", "/p:Platform=x64",
         "/p:PlatformToolset=$PlatformToolset",
         "/p:SolutionDir=$repoRoot\", "/p:SkipNativeGuiBuild=true", "/p:VcpkgManifestInstall=false",
         "/p:VcpkgInstalledDir=$installedDir\", "/p:ForceImportAfterCppTargets=$vcpkgTargets"
@@ -84,19 +95,24 @@ try {
 
     if ($RunNativeTests) {
         Invoke-Checked $msbuild (@("IntelPresentMon\UnitTests\UnitTests.vcxproj") + $nativeArguments)
+        Invoke-Checked $msbuild (@("IntelPresentMon\PresentMonAPI2Tests\PresentMonAPI2Tests.vcxproj") + $nativeArguments)
         $vstest = Join-Path $VisualStudioPath "Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe"
         if (-not (Test-Path -LiteralPath $vstest)) {
             throw "The Visual Studio Test tools component is required for -RunNativeTests."
         }
-        Push-Location (Join-Path $repoRoot "build\$managedConfiguration")
+        Push-Location (Join-Path $repoRoot "build\$nativeConfiguration")
         try {
             Invoke-Checked $vstest @("PresentMonUnitTests.dll", "/Platform:x64")
+            Invoke-Checked $vstest @(
+                "PresentMonAPI2Tests.dll", "/Platform:x64",
+                "/TestCaseFilter:FullyQualifiedName~UiProcessGuardTests"
+            )
         }
         finally {
             Pop-Location
         }
     }
-    Write-Host "Capture application: $repoRoot\build\$managedConfiguration\PresentMon.exe"
+    Write-Host "Capture application: $repoRoot\build\$nativeConfiguration\PresentMon.exe"
 }
 finally {
     $env:VCPKG_VISUAL_STUDIO_PATH = $originalVisualStudioPath

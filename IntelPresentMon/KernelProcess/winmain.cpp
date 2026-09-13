@@ -567,6 +567,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 				if (opt.logFolder) {
 					args.append_range(std::vector{ "--p2c-log-folder"s, *opt.logFolder });
 				}
+				if (opt.uiDataDirectory) {
+					args.append_range(std::vector{ "--data-directory"s, *opt.uiDataDirectory });
+				}
 				// Launch the unpackaged WinUI application with its self-contained runtime.
 				auto uiChild = [&] {
 					// WORKAROUND: keep a relative exe name while forcing install-dir cwd for child startup.

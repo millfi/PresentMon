@@ -29,8 +29,7 @@ function Assert-Rejected {
 try {
     $null = [IO.Directory]::CreateDirectory($payload)
     $required = @(
-        'PresentMonUI.exe', 'PresentMonUI.dll', 'PresentMonUI.pri', 'coreclr.dll',
-        'hostfxr.dll', 'hostpolicy.dll', 'System.Private.CoreLib.dll', 'Microsoft.UI.Xaml.dll'
+        'PresentMonUI.exe', 'Microsoft.UI.Xaml.dll'
     )
     $binary = [byte[]]::new(128)
     $binary[0] = 0x4d
@@ -43,12 +42,7 @@ try {
     foreach ($name in $required) {
         [IO.File]::WriteAllBytes((Join-Path $payload $name), $binary)
     }
-    $runtimeConfigFile = Join-Path $payload 'PresentMonUI.runtimeconfig.json'
-    $runtimeConfig = '{"runtimeOptions":{"tfm":"net10.0","includedFrameworks":[{"name":"Microsoft.NETCore.App","version":"10.0.0"}]}}'
-    [IO.File]::WriteAllText($runtimeConfigFile, $runtimeConfig)
-    $depsFile = Join-Path $payload 'PresentMonUI.deps.json'
-    $deps = '{"runtimeTarget":{"name":".NETCoreApp,Version=v10.0/win-x64"}}'
-    [IO.File]::WriteAllText($depsFile, $deps)
+    [IO.File]::WriteAllBytes((Join-Path $payload 'resources.pri'), [byte[]](1, 2, 3))
 
     foreach ($relative in @(
         'Assets\nested\icon.png', 'ja-JP\Microsoft.UI.Xaml.resources.dll',
@@ -65,11 +59,11 @@ try {
     $namespaces = [Xml.XmlNamespaceManager]::new($xml.NameTable)
     $namespaces.AddNamespace('w', 'http://schemas.microsoft.com/wix/2006/wi')
     $files = $xml.SelectNodes('//w:File', $namespaces)
-    Assert-True -Condition ($files.Count -eq 12) -Message "Expected 12 runtime files, got $($files.Count)."
+    Assert-True -Condition ($files.Count -eq 5) -Message "Expected 5 native runtime files, got $($files.Count)."
     $nestedFile = $xml.SelectSingleNode('//w:File[@Name="icon.png"]', $namespaces)
     Assert-True -Condition ($null -ne $nestedFile) -Message 'Nested content must be harvested.'
     Assert-True -Condition ($nestedFile.Source -eq '$(var.WinUIOutputDir)\Assets\nested\icon.png') -Message 'Payload source paths must be relative to the WiX output constant.'
-    Assert-True -Condition ($xml.SelectNodes('//w:Component[@Win64="yes" and @Guid="*"]', $namespaces).Count -eq 12) -Message 'Every payload file must have an x64 component and stable auto-generated GUID.'
+    Assert-True -Condition ($xml.SelectNodes('//w:Component[@Win64="yes" and @Guid="*"]', $namespaces).Count -eq 5) -Message 'Every payload file must have an x64 component and stable auto-generated GUID.'
     Assert-True -Condition ($xml.SelectNodes('//w:Directory', $namespaces).Count -eq 3) -Message 'Only runtime content directories should be harvested.'
     $initialContent = [IO.File]::ReadAllText($wixFile)
     $initialTimestamp = (Get-Item -LiteralPath $wixFile).LastWriteTimeUtc
@@ -77,18 +71,9 @@ try {
     Assert-True -Condition ([IO.File]::ReadAllText($wixFile) -ceq $initialContent) -Message 'Harvest output must be deterministic.'
     Assert-True -Condition ((Get-Item -LiteralPath $wixFile).LastWriteTimeUtc -eq $initialTimestamp) -Message 'An unchanged harvest should preserve its timestamp.'
 
-    $coreRuntimeFile = Join-Path $payload 'coreclr.dll'
-    [IO.File]::WriteAllBytes($coreRuntimeFile, [byte[]]::new(0))
-    Assert-Rejected -ExpectedMessage 'Required WinUI runtime file is missing or empty:*coreclr.dll*'
-    [IO.File]::WriteAllBytes($coreRuntimeFile, $binary)
-
-    [IO.File]::WriteAllText($runtimeConfigFile, '{"runtimeOptions":{"framework":{"name":"Microsoft.NETCore.App","version":"10.0.0"}}}')
-    Assert-Rejected -ExpectedMessage '*must describe a self-contained .NET application*'
-    [IO.File]::WriteAllText($runtimeConfigFile, $runtimeConfig)
-
-    [IO.File]::WriteAllText($depsFile, '{"runtimeTarget":{"name":".NETCoreApp,Version=v10.0/win-arm64"}}')
-    Assert-Rejected -ExpectedMessage '*must target the win-x64 runtime*'
-    [IO.File]::WriteAllText($depsFile, $deps)
+    [IO.File]::WriteAllBytes((Join-Path $payload 'coreclr.dll'), $binary)
+    Assert-Rejected -ExpectedMessage '*must not contain managed .NET runtime files:*coreclr.dll*'
+    Remove-Item -LiteralPath (Join-Path $payload 'coreclr.dll') -Force
 
     $binary[0x44] = 0x4c
     $binary[0x45] = 0x01

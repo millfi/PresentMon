@@ -64,6 +64,7 @@ namespace p2c::cli
 	private: Group gu_{ this, "UI", "Options for the WinUI control panel" }; public:
 		Flag enableUiDevOptions{ this, "--enable-ui-dev-options", "Enable development controls in the UI" };
 		Option<std::string> uiMutexName{ this, "--ui-mutex-name", "UiBrowserProcess", "Suffix for the UI process mutex name" };
+		Option<std::string> uiDataDirectory{ this, "--ui-data-directory", "", "Override the data directory passed to the WinUI client" };
 		Option<DuplicateUiResponse> duplicateUiResponse{ this, "--duplicate-ui-response", DuplicateUiResponse::Ask,
 			"Automatic response for duplicate UI prompt: ask, yes, or no", duplicateUiResponseTf_ };
 

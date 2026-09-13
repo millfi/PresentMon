@@ -183,4 +183,4 @@ We have noted that an application can remain on top (even above fullscreen exclu
 
 ### WinUI 3
 
-The control panel uses C# and XAML with the Windows App SDK. Its managed core preserves the existing preference/loadout formats and exchanges binary actions with the native kernel over a named pipe. The kernel owns telemetry, overlay rendering, CSV capture, and global hotkeys. See [the WinUI implementation guide](IntelPresentMon/AppWinUI/README.md) for the project layout and regression checks.
+The control panel uses C++/WinRT and XAML with the Windows App SDK. Its native core preserves the existing preference and loadout formats and exchanges binary actions with the native kernel over a named pipe. The kernel owns telemetry, overlay rendering, CSV capture, and global hotkeys. See [the WinUI implementation guide](IntelPresentMon/AppWinUICpp/README.md) for the project layout and regression checks.

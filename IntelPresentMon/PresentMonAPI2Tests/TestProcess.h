@@ -10,6 +10,9 @@
 #include "../CommonUtilities/pipe/Pipe.h"
 #include <boost/process.hpp>
 #include <cereal/archives/json.hpp>
+#include <algorithm>
+#include <array>
+#include <atomic>
 #include <cctype>
 #include <iostream>
 #include <format>
@@ -17,6 +20,7 @@
 #include <sstream>
 #include <filesystem>
 #include <chrono>
+#include <ranges>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 namespace as = boost::asio;
@@ -218,20 +222,16 @@ public:
 	ServiceProcess(as::io_context& ioctx, JobManager& jm, const std::vector<std::string>& customArgs,
 		const CommonProcessArgs& common)
 		:
-		ConnectedTestProcess{ ioctx, jm, "PresentMonService.exe"s, MakeArgs_(customArgs, common) }
+		ConnectedTestProcess{ ioctx, jm, "PresentMonService.exe"s, BuildArguments(customArgs, common) }
 	{
 	}
-	test::service::Status QueryStatus()
-	{
-		test::service::Status status;
-		std::istringstream is{ Command("status") };
-		cereal::JSONInputArchive{ is }(status);
-		return status;
-	}
-private:
-	std::vector<std::string> MakeArgs_(const std::vector<std::string>& customArgs,
+	static std::vector<std::string> BuildArguments(const std::vector<std::string>& customArgs,
 		const CommonProcessArgs& common)
 	{
+		const auto hasEtwSessionName = HasOption_(customArgs, "--etw-session-name");
+		const auto hasLogPipeName = HasOption_(customArgs, "--log-pipe-name");
+		const auto instanceSuffix = hasEtwSessionName && hasLogPipeName ? std::string{} : NextInstanceSuffix_();
+
 		std::vector<std::string> allArgs{
 			"--control-pipe"s, common.ctrlPipe,
 			"--shm-name-prefix"s, common.shmNamePrefix,
@@ -241,9 +241,37 @@ private:
 			"--log-level"s, common.logLevel,
 			"--enable-debugger-log"s,
 		};
+		if (!hasEtwSessionName) {
+			allArgs.append_range(std::array{ "--etw-session-name"s,
+				std::format("pm-api2-tests-etw-{}", instanceSuffix) });
+		}
+		if (!hasLogPipeName) {
+			allArgs.append_range(std::array{ "--log-pipe-name"s,
+				std::format("pm-api2-tests-log-{}", instanceSuffix) });
+		}
 		AppendVerboseModulesArgs_(allArgs, common.logVerboseModules, "--log-verbose-modules");
 		allArgs.append_range(customArgs);
 		return allArgs;
+	}
+	test::service::Status QueryStatus()
+	{
+		test::service::Status status;
+		std::istringstream is{ Command("status") };
+		cereal::JSONInputArchive{ is }(status);
+		return status;
+	}
+private:
+	static bool HasOption_(const std::vector<std::string>& args, const std::string& option)
+	{
+		const auto inlineOption = option + "=";
+		return std::ranges::any_of(args, [&option, &inlineOption](const std::string& value) {
+			return value == option || value.starts_with(inlineOption);
+		});
+	}
+	static std::string NextInstanceSuffix_()
+	{
+		static std::atomic_uint64_t nextInstance{ 0 };
+		return std::format("{}-{}", GetCurrentProcessId(), nextInstance.fetch_add(1));
 	}
 };
 

@@ -34,8 +34,8 @@ try {
         }
     }
 
-    Invoke-BootstrapStep "Restore WinUI application" {
-        dotnet restore (Join-Path $repoRoot "IntelPresentMon\AppWinUI\PresentMonUI.csproj") -p:Platform=x64 -p:RuntimeIdentifier=win-x64
+    Invoke-BootstrapStep "Restore native WinUI application" {
+        & (Join-Path $repoRoot "Tools\build-ui-cpp.ps1") -RestoreOnly
     }
 } finally {
     Set-Location $originalLocation

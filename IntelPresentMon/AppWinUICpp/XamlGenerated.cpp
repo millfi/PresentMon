@@ -1,0 +1,5 @@
+#include "pch.h"
+#include "App.xaml.h"
+#include "MainWindow.xaml.h"
+#include "App.xaml.g.hpp"
+#include "MainWindow.xaml.g.hpp"

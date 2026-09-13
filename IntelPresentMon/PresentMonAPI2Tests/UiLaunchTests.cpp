@@ -164,6 +164,20 @@ namespace UiLaunchTests
 		Assert::IsTrue(process.WaitForExit(5s), L"Kernel process did not exit");
 	}
 
+	static std::optional<std::string> FindArgumentValue_(const std::vector<std::string>& args, const std::string& option)
+	{
+		const auto inlineOption = option + "=";
+		for (size_t index = 0; index < args.size(); ++index) {
+			if (args[index] == option) {
+				return index + 1 < args.size() ? std::optional{ args[index + 1] } : std::nullopt;
+			}
+			if (args[index].starts_with(inlineOption)) {
+				return args[index].substr(inlineOption.size());
+			}
+		}
+		return std::nullopt;
+	}
+
 	TEST_CLASS(UiProcessGuardTests)
 	{
 		TestFixture fixture_;
@@ -177,6 +191,36 @@ namespace UiLaunchTests
 		TEST_METHOD_CLEANUP(Cleanup)
 		{
 			fixture_.Cleanup();
+		}
+
+		TEST_METHOD(ServiceChildrenUsePrivateEtwAndLogNames)
+		{
+			const CommonProcessArgs common{
+				.ctrlPipe = R"(\\.\pipe\pm-ui-launch-argument-test)",
+				.shmNamePrefix = "pm_ui_launch_argument_test",
+				.logLevel = "debug",
+				.logFolder = logFolder_,
+				.sampleClientMode = "MultiClient",
+			};
+			const auto first = ServiceProcess::BuildArguments({}, common);
+			const auto second = ServiceProcess::BuildArguments({}, common);
+			const auto firstEtw = FindArgumentValue_(first, "--etw-session-name");
+			const auto secondEtw = FindArgumentValue_(second, "--etw-session-name");
+			const auto firstLogPipe = FindArgumentValue_(first, "--log-pipe-name");
+			const auto secondLogPipe = FindArgumentValue_(second, "--log-pipe-name");
+			Assert::IsTrue(firstEtw.has_value() && secondEtw.has_value(), L"Test services require private ETW session names");
+			Assert::IsTrue(firstLogPipe.has_value() && secondLogPipe.has_value(), L"Test services require private log pipe names");
+			Assert::AreNotEqual("PMService"s, *firstEtw);
+			Assert::AreNotEqual("PMService"s, *secondEtw);
+			Assert::AreNotEqual(*firstEtw, *secondEtw);
+			Assert::AreNotEqual(*firstLogPipe, *secondLogPipe);
+
+			const auto explicitNames = ServiceProcess::BuildArguments({
+				"--etw-session-name"s, "explicit-etw"s,
+				"--log-pipe-name=explicit-log"s,
+			}, common);
+			Assert::AreEqual("explicit-etw"s, *FindArgumentValue_(explicitNames, "--etw-session-name"));
+			Assert::AreEqual("explicit-log"s, *FindArgumentValue_(explicitNames, "--log-pipe-name"));
 		}
 
 		TEST_METHOD(ApplicationLaunchBringsExistingUiToForeground)

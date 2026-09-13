@@ -75,15 +75,15 @@
       <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
       <RefTargetDir>INSTALLFOLDER</RefTargetDir>
     </ProjectReference>
-    <ProjectReference Include="..\AppWinUI\PresentMonUI.csproj">
+    <ProjectReference Include="..\AppWinUICpp\PresentMonUI.vcxproj">
       <Name>PresentMonUI</Name>
       <Project>{3c80b001-e165-4e0e-a92d-5767cf4fb1f8}</Project>
       <SetPlatform>Platform=x64</SetPlatform>
-      <AdditionalProperties>Platform=x64;RuntimeIdentifier=win-x64;SelfContained=true;WindowsAppSDKSelfContained=true</AdditionalProperties>
       <Private>True</Private>
       <DoNotHarvest>True</DoNotHarvest>
       <RefProjectOutputGroups>Binaries;Content;Satellites</RefProjectOutputGroups>
       <RefTargetDir>pm_app_ui_folder</RefTargetDir>
+      <SetConfiguration Condition="'$(Configuration)'=='Release-EDSS'">Configuration=Release</SetConfiguration>
     </ProjectReference>
     <ProjectReference Include="..\KernelProcess\KernelProcess.vcxproj">
       <Name>KernelProcess</Name>

@@ -69,7 +69,7 @@ function Get-StableId {
 
 $root = [IO.Path]::GetFullPath($OutputRoot).TrimEnd('\', '/')
 if (-not (Test-Path -LiteralPath $root -PathType Container)) {
-    throw "WinUI output is missing: $root. Build PresentMonUI for x64 with SelfContained=true and WindowsAppSDKSelfContained=true."
+    throw "WinUI output is missing: $root. Build the native PresentMonUI project for x64 with Windows App SDK self-contained deployment enabled."
 }
 if (((Get-Item -LiteralPath $root).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
     throw "The WinUI output directory must not be a symbolic link or junction: $root"
@@ -77,37 +77,33 @@ if (((Get-Item -LiteralPath $root).Attributes -band [IO.FileAttributes]::Reparse
 
 $requiredFiles = @(
     'PresentMonUI.exe',
-    'PresentMonUI.dll',
-    'PresentMonUI.deps.json',
-    'PresentMonUI.runtimeconfig.json',
-    'PresentMonUI.pri',
-    'coreclr.dll',
-    'hostfxr.dll',
-    'hostpolicy.dll',
-    'System.Private.CoreLib.dll',
-    'Microsoft.UI.Xaml.dll'
+    'Microsoft.UI.Xaml.dll',
+    'resources.pri'
 )
 foreach ($name in $requiredFiles) {
     $path = Join-Path $root $name
     if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Length -eq 0) {
-        throw "Required WinUI runtime file is missing or empty: $path. Build a self-contained x64 output before building the installer."
+        throw "Required native WinUI runtime file is missing or empty: $path. Build the self-contained x64 output before building the installer."
     }
 }
-foreach ($name in @('PresentMonUI.exe', 'coreclr.dll', 'Microsoft.UI.Xaml.dll')) {
+foreach ($name in @('PresentMonUI.exe', 'Microsoft.UI.Xaml.dll')) {
     Assert-X64Binary -Path (Join-Path $root $name)
 }
 
-$runtimeConfig = Get-Content -LiteralPath (Join-Path $root 'PresentMonUI.runtimeconfig.json') -Raw | ConvertFrom-Json
-$runtimeOptions = $runtimeConfig.runtimeOptions
-if ($null -ne $runtimeOptions.PSObject.Properties['framework'] -or
-    $null -ne $runtimeOptions.PSObject.Properties['frameworks'] -or
-    $null -eq $runtimeOptions.PSObject.Properties['includedFrameworks'] -or
-    @($runtimeOptions.includedFrameworks).Count -eq 0) {
-    throw 'PresentMonUI.runtimeconfig.json must describe a self-contained .NET application with includedFrameworks.'
-}
-$dependencies = Get-Content -LiteralPath (Join-Path $root 'PresentMonUI.deps.json') -Raw | ConvertFrom-Json
-if ($dependencies.runtimeTarget.name -notmatch '/win-x64$') {
-    throw 'PresentMonUI.deps.json must target the win-x64 runtime.'
+$managedRuntimeFiles = @(
+    'PresentMonUI.dll',
+    'PresentMonUI.deps.json',
+    'PresentMonUI.runtimeconfig.json',
+    'coreclr.dll',
+    'hostfxr.dll',
+    'hostpolicy.dll',
+    'System.Private.CoreLib.dll'
+)
+foreach ($name in $managedRuntimeFiles) {
+    $path = Join-Path $root $name
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+        throw "The native WinUI payload must not contain managed .NET runtime files: $path"
+    }
 }
 
 [string[]]$files = @(Get-PayloadFiles -Directory $root)

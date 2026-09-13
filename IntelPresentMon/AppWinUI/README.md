@@ -119,6 +119,24 @@ any sample position, sliding-window expiry, invalid samples, and raw precision.
 exercises raw GPU Busy eligibility with real rendering, non-presenting
 processes, process restart, stale data expiry, and independent overlay tracking.
 
+Run the backdrop regression on an unlocked Windows desktop with desktop acrylic
+support, after successfully building the application:
+
+```powershell
+dotnet build IntelPresentMon\AppWinUI.Tests\PresentMonUI.Tests.csproj
+dotnet run --project IntelPresentMon\AppWinUI.Tests\PresentMonUI.Tests.csproj --no-build
+```
+
+This uses the production `ThinAcrylicBackdrop` with real WinUI windows. It checks
+15 Light/Dark/System transitions after forced garbage collection, plus
+minimize/restore, backdrop replacement, and window close. Before the fix, the
+first transition after collection reproduced the `E_INVALIDARG` (`target`)
+exception in `SystemBackdrop.OnDefaultSystemBackdropConfigurationChanged`.
+XAML updates the shared configuration before that notification, so the custom
+backdrop overrides it without forwarding an expired weak target to the native
+base method. The controller continues observing theme, activation, and
+accessibility changes through the same configuration object.
+
 ## Desktop verification on 2026-09-12
 
 The application was launched on the actual Windows desktop and exercised through

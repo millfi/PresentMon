@@ -29,6 +29,16 @@ function Invoke-Checked {
     }
 }
 
+function Invoke-CheckedScript {
+    param([string]$Script, [hashtable]$Parameters = @{})
+
+    $global:LASTEXITCODE = 0
+    & $Script @Parameters
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Script failed with exit code $LASTEXITCODE."
+    }
+}
+
 try {
     Set-Location $repoRoot
     if (-not $VisualStudioPath) {
@@ -107,9 +117,25 @@ try {
                 "PresentMonAPI2Tests.dll", "/Platform:x64",
                 "/TestCaseFilter:FullyQualifiedName~UiProcessGuardTests"
             )
+            Invoke-Checked $vstest @(
+                "PresentMonAPI2Tests.dll", "/Platform:x64",
+                "/TestCaseFilter:FullyQualifiedName~RealtimeTrackProcessTest"
+            )
         }
         finally {
             Pop-Location
+        }
+        $overlaySmokeProject = Join-Path $repoRoot 'IntelPresentMon\AppWinUICpp\PresentMonUI.OverlaySmokeHost.vcxproj'
+        $overlaySmokeHost = Join-Path $repoRoot "build\$nativeConfiguration\ui-tests\PresentMonUI.OverlaySmokeHost.exe"
+        $overlaySmokeReports = Join-Path $repoRoot "build\$nativeConfiguration\ui-overlay-smoke"
+        Invoke-Checked $msbuild (@($overlaySmokeProject) + $nativeArguments)
+        Invoke-CheckedScript -Script (Join-Path $repoRoot 'Tools\test-ui-cpp-overlay.ps1') -Parameters @{
+            Configuration = $nativeConfiguration
+            HostExecutable = $overlaySmokeHost
+            PresenterExecutable = Join-Path $repoRoot 'Tools\PresentBench.exe'
+            KernelExecutable = Join-Path $repoRoot "build\$nativeConfiguration\PresentMon.exe"
+            ApiDll = Join-Path $repoRoot "build\$nativeConfiguration\PresentMonAPI2.dll"
+            ReportDirectory = $overlaySmokeReports
         }
     }
     Write-Host "Capture application: $repoRoot\build\$nativeConfiguration\PresentMon.exe"

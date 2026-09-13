@@ -1,20 +1,36 @@
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Run')]
 param(
+    [Parameter(ParameterSetName = 'Run')]
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
 
+    [Parameter(ParameterSetName = 'Run')]
     [string]$HostExecutable,
 
+    [Parameter(ParameterSetName = 'Run')]
     [string]$PresenterExecutable,
 
+    [Parameter(ParameterSetName = 'Run')]
     [string]$KernelExecutable,
 
+    [Parameter(ParameterSetName = 'Run')]
     [string]$ApiDll,
 
+    [Parameter(ParameterSetName = 'Run')]
     [string]$ReportDirectory,
 
+    [Parameter(ParameterSetName = 'Run')]
     [ValidateRange(15, 180)]
-    [int]$TimeoutSeconds = 90
+    [int]$TimeoutSeconds = 90,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'Validate')]
+    [string]$ReportPath,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'Validate')]
+    [string]$RunId,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'Validate')]
+    [DateTime]$NotBeforeUtc
 )
 
 Set-StrictMode -Version Latest
@@ -44,6 +60,11 @@ function Assert-OverlaySmokeReport {
     catch {
         throw "Native overlay smoke report is malformed JSON: $Path"
     }
+    $expectedProperties = @('runId', 'complete', 'steps', 'failure')
+    $actualProperties = @($report.PSObject.Properties.Name)
+    if ($actualProperties.Count -ne $expectedProperties.Count -or (Compare-Object $expectedProperties $actualProperties)) {
+        throw "Native overlay smoke report has an unexpected schema: $Path"
+    }
     if ($report.runId -isnot [string] -or $report.runId -cne $ExpectedRunId) {
         throw "Native overlay smoke report run ID does not match: $Path"
     }
@@ -63,6 +84,12 @@ function Assert-OverlaySmokeReport {
             throw "Native overlay smoke report has unexpected steps: $Path"
         }
     }
+}
+
+if ($PSCmdlet.ParameterSetName -eq 'Validate') {
+    Assert-OverlaySmokeReport -Path $ReportPath -ExpectedRunId $RunId -NotBeforeUtc $NotBeforeUtc.ToUniversalTime()
+    Write-Host 'Native overlay smoke report passed validation.'
+    return
 }
 
 $repoRoot = Split-Path $PSScriptRoot -Parent

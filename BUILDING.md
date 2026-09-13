@@ -51,11 +51,17 @@ For a complete local capture application without building the MSI, run:
 
 This discovers Visual Studio and its bundled vcpkg (or uses `VCPKG_ROOT`), restores the pinned native dependencies and the native WinUI package references, builds the WinUI application, capture kernel, service, and middleware, then builds and runs the native unit tests. Dependency build files stay under `build\vcpkg-cache` and `vcpkg_installed`; vcpkg may also use its standard user registry and binary caches. Use `-SkipRestore` on subsequent builds. `-VisualStudioPath`, `-VcpkgRoot`, and `-PlatformToolset` select explicit tool installations. The native UI requires the v145 toolset from Visual Studio 2026. No global vcpkg integration is required by this script.
 
-`-RunNativeTests` also builds `PresentMonAPI2Tests` and runs only the
-`UiProcessGuardTests` class. These checks verify foregrounding an existing
-minimized UI, replacing an existing UI, and the corresponding concurrent-launch
-cases. They run against the staged native `ui` payload; broader service and API
+`-RunNativeTests` also builds `PresentMonAPI2Tests` and runs the
+`UiProcessGuardTests` class plus `RealtimeTrackProcessTest`. The UI guards
+verify foregrounding an existing minimized UI, replacing an existing UI, and
+the corresponding concurrent-launch cases. The realtime test requires the
+staged service and a PresentBench frame source. Broader service and API
 integration scenarios in that project are not selected by the capture helper.
+It then builds and runs the native overlay smoke host. That host starts
+PresentBench and a staged `--svc-as-child` kernel with generated control-pipe,
+shared-memory, ETW, UI-mutex, log, and UI-data names. It pushes the Basic
+preset and requires a visible kernel-owned overlay for five seconds without
+touching installed-service state or user preferences.
 
 For an optimized local Release build without certificate setup or signing, explicitly opt in:
 
@@ -105,7 +111,7 @@ From PowerShell, run the complete development payload with:
 > Pop-Location
 ```
 
-For UI layout checks without capture, run `build\Debug\ui\PresentMonUI.exe` directly. Capture and overlay controls require launching through `PresentMon.exe` and an available service.
+For UI layout checks without capture, run `build\Debug\ui\PresentMonUI.exe` directly. Capture and overlay controls require launching through `PresentMon.exe`. A normal launch uses the installed service; a `--svc-as-child` development launch uses the staged child service and ends with its parent. If a normal launch cannot capture frames, check the installed PresentMon service before retrying; do not terminate unrelated service or test processes.
 
 For default signed Release builds with `uiAccess=true`, either move the full Release output payload to a secure directory such as "Program Files" or "System32", or disable the secure directory check for local development. You cannot run these builds from the IDE typically. An opt-in unsigned Release build uses `uiAccess=false` and can be launched from `build\Release` with the development command shown above; it does not request UIAccess privileges. The installer is often the easier path for signed Release validation:
 

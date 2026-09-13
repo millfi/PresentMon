@@ -2,6 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $smokeScript = Join-Path $PSScriptRoot 'test-ui-cpp-smoke.ps1'
+$overlayScript = Join-Path $PSScriptRoot 'test-ui-cpp-overlay.ps1'
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('presentmon-native-ui-smoke-' + [Guid]::NewGuid().ToString('N'))
 $runId = [Guid]::NewGuid().ToString('N')
 $freshAfterUtc = [DateTime]::UtcNow
@@ -36,6 +37,21 @@ function Assert-Rejected {
     }
     if (-not $rejected) {
         throw "Validator accepted the $Name report."
+    }
+}
+
+function Assert-OverlayRejected {
+    param([string]$Name, [string]$Path, [DateTime]$NotBeforeUtc)
+
+    $rejected = $false
+    try {
+        & $overlayScript -ReportPath $Path -RunId $runId -NotBeforeUtc $NotBeforeUtc
+    }
+    catch {
+        $rejected = $true
+    }
+    if (-not $rejected) {
+        throw "Overlay validator accepted the $Name report."
     }
 }
 
@@ -87,7 +103,49 @@ try {
     Write-Report -Path $failedPath -Report $failed
     Assert-Rejected -Name 'failed' -Path $failedPath -NotBeforeUtc $freshAfterUtc.AddSeconds(-1)
 
-    Write-Host 'Native UI smoke report validator regression tests passed.'
+    $overlaySteps = @('presenter-started', 'kernel-connected', 'basic-spec-pushed', 'overlay-visible', 'overlay-stable', 'cleanup')
+    $overlayValidPath = Join-Path $scratch 'overlay-valid.json'
+    $overlayValid = [ordered]@{ runId = $runId; complete = $true; steps = $overlaySteps; failure = '' }
+    Write-Report -Path $overlayValidPath -Report $overlayValid
+    & $overlayScript -ReportPath $overlayValidPath -RunId $runId -NotBeforeUtc $freshAfterUtc.AddSeconds(-1)
+
+    Assert-OverlayRejected -Name 'missing' -Path (Join-Path $scratch 'overlay-missing.json') -NotBeforeUtc $freshAfterUtc
+
+    $overlayStalePath = Join-Path $scratch 'overlay-stale.json'
+    Write-Report -Path $overlayStalePath -Report $overlayValid
+    (Get-Item -LiteralPath $overlayStalePath).LastWriteTimeUtc = $freshAfterUtc.AddMinutes(-2)
+    Assert-OverlayRejected -Name 'stale' -Path $overlayStalePath -NotBeforeUtc $freshAfterUtc
+
+    $overlayMalformedPath = Join-Path $scratch 'overlay-malformed.json'
+    [IO.File]::WriteAllText($overlayMalformedPath, '{', [Text.UTF8Encoding]::new($false))
+    Assert-OverlayRejected -Name 'malformed' -Path $overlayMalformedPath -NotBeforeUtc $freshAfterUtc.AddSeconds(-1)
+
+    $overlayIncompletePath = Join-Path $scratch 'overlay-incomplete.json'
+    $overlayIncomplete = [ordered]@{ runId = $runId; complete = $false; steps = $overlaySteps; failure = '' }
+    Write-Report -Path $overlayIncompletePath -Report $overlayIncomplete
+    Assert-OverlayRejected -Name 'incomplete' -Path $overlayIncompletePath -NotBeforeUtc $freshAfterUtc.AddSeconds(-1)
+
+    $overlayWrongPath = Join-Path $scratch 'overlay-wrong.json'
+    $overlayWrong = [ordered]@{ runId = 'wrong-run-id'; complete = $true; steps = $overlaySteps; failure = '' }
+    Write-Report -Path $overlayWrongPath -Report $overlayWrong
+    Assert-OverlayRejected -Name 'wrong-run-id' -Path $overlayWrongPath -NotBeforeUtc $freshAfterUtc.AddSeconds(-1)
+
+    $overlayMissingStepPath = Join-Path $scratch 'overlay-missing-step.json'
+    $overlayMissingStep = [ordered]@{ runId = $runId; complete = $true; steps = @($overlaySteps | Select-Object -Skip 1); failure = '' }
+    Write-Report -Path $overlayMissingStepPath -Report $overlayMissingStep
+    Assert-OverlayRejected -Name 'missing-step' -Path $overlayMissingStepPath -NotBeforeUtc $freshAfterUtc.AddSeconds(-1)
+
+    $overlayDuplicatePath = Join-Path $scratch 'overlay-duplicate.json'
+    $overlayDuplicate = [ordered]@{ runId = $runId; complete = $true; steps = @('presenter-started') + $overlaySteps; failure = '' }
+    Write-Report -Path $overlayDuplicatePath -Report $overlayDuplicate
+    Assert-OverlayRejected -Name 'duplicate-step' -Path $overlayDuplicatePath -NotBeforeUtc $freshAfterUtc.AddSeconds(-1)
+
+    $overlayFailedPath = Join-Path $scratch 'overlay-failed.json'
+    $overlayFailed = [ordered]@{ runId = $runId; complete = $true; steps = $overlaySteps; failure = 'native failure' }
+    Write-Report -Path $overlayFailedPath -Report $overlayFailed
+    Assert-OverlayRejected -Name 'failed' -Path $overlayFailedPath -NotBeforeUtc $freshAfterUtc.AddSeconds(-1)
+
+    Write-Host 'Native UI and overlay smoke report validator regression tests passed.'
 }
 finally {
     $resolvedScratch = [IO.Path]::GetFullPath($scratch)

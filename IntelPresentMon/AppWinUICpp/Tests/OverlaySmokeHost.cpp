@@ -6,18 +6,23 @@
 #include "../Interop/KernelProtocol.h"
 
 #include <Windows.h>
+#include <evntrace.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <stop_token>
 #include <system_error>
 #include <thread>
 #include <utility>
@@ -33,6 +38,8 @@ namespace pmon::ui::tests
         constexpr auto kOverlayClass = L"PMON2-CAP-CLS";
         constexpr auto kOverlayAppearTimeout = 45s;
         constexpr auto kOverlayStableDuration = 5s;
+        constexpr auto kUiInitializationDelay = 2s;
+        constexpr auto kUiIdentityProperty = L"IntelPresentMon.UiMutexSuffixAtom";
 
         struct SmokeReport
         {
@@ -96,6 +103,39 @@ namespace pmon::ui::tests
             ScopedHandle job_;
         };
 
+        void StopOwnedTraceSession(const std::wstring& name) noexcept
+        {
+            struct Properties : EVENT_TRACE_PROPERTIES
+            {
+                wchar_t LoggerName[1024];
+            } properties{};
+            properties.Wnode.BufferSize = sizeof(properties);
+            properties.LoggerNameOffset = offsetof(Properties, LoggerName);
+            const auto status = ControlTraceW(0, name.c_str(), &properties, EVENT_TRACE_CONTROL_STOP);
+            if (status != ERROR_SUCCESS && status != ERROR_WMI_INSTANCE_NOT_FOUND && status != ERROR_FILE_NOT_FOUND) {
+                std::cerr << "Unable to stop overlay smoke ETW session: " << status << '\n';
+            }
+        }
+
+        class OverlaySmokeCleanup
+        {
+        public:
+            explicit OverlaySmokeCleanup(std::wstring etwSession) : etwSession_(std::move(etwSession)) {}
+            ~OverlaySmokeCleanup()
+            {
+                Terminate();
+                StopOwnedTraceSession(etwSession_);
+            }
+
+            KillOnCloseJob& Job() noexcept { return job_; }
+            void Terminate() noexcept { job_.Terminate(); }
+            void StopTraceSession() noexcept { StopOwnedTraceSession(etwSession_); }
+
+        private:
+            KillOnCloseJob job_;
+            std::wstring etwSession_;
+        };
+
         class ChildProcess
         {
         public:
@@ -132,6 +172,15 @@ namespace pmon::ui::tests
             }
 
             DWORD Id() const noexcept { return process_.Get() ? GetProcessId(process_.Get()) : 0; }
+            DWORD ExitCode() const
+            {
+                if (!process_.Get()) return 0;
+                DWORD exitCode = 0;
+                if (!GetExitCodeProcess(process_.Get(), &exitCode)) {
+                    throw std::system_error((int)GetLastError(), std::system_category(), "Unable to query overlay smoke process exit code");
+                }
+                return exitCode;
+            }
             bool IsRunning() const
             {
                 if (!process_.Get()) return false;
@@ -145,7 +194,10 @@ namespace pmon::ui::tests
             {
                 if (!process_.Get()) return;
                 const auto result = WaitForSingleObject(process_.Get(), timeoutMilliseconds);
-                if (result != WAIT_OBJECT_0 && result != WAIT_TIMEOUT) {
+                if (result == WAIT_TIMEOUT) {
+                    throw std::runtime_error("Timed out waiting for overlay smoke process cleanup.");
+                }
+                if (result != WAIT_OBJECT_0) {
                     throw std::system_error((int)GetLastError(), std::system_category(), "Unable to wait for overlay smoke process");
                 }
             }
@@ -252,13 +304,69 @@ namespace pmon::ui::tests
         HWND FindOverlayWindowForKernel(DWORD kernelPid)
         {
             OverlaySearch search{ .KernelPid = kernelPid };
-            EnumWindows(FindOverlayWindow, (LPARAM)&search);
+            EnumWindows(FindOverlayWindow, reinterpret_cast<LPARAM>(&search));
             return search.Window;
+        }
+
+        struct UiSearch
+        {
+            ATOM Identity = 0;
+            HWND Window = nullptr;
+        };
+
+        BOOL CALLBACK FindUiWindow(HWND window, LPARAM data)
+        {
+            auto& search = *reinterpret_cast<UiSearch*>(data);
+            if (!IsWindowVisible(window)) return TRUE;
+            const auto property = GetPropW(window, kUiIdentityProperty);
+            if ((ATOM)reinterpret_cast<UINT_PTR>(property) == search.Identity) {
+                search.Window = window;
+                return FALSE;
+            }
+            return TRUE;
+        }
+
+        void ThrowIfTimedOut(std::stop_token deadline)
+        {
+            if (deadline.stop_requested()) throw std::runtime_error("Overlay smoke exceeded its total timeout.");
+        }
+
+        void SleepWithDeadline(std::chrono::milliseconds duration, std::stop_token deadline)
+        {
+            const auto end = std::chrono::steady_clock::now() + duration;
+            while (std::chrono::steady_clock::now() < end) {
+                ThrowIfTimedOut(deadline);
+                std::this_thread::sleep_for(25ms);
+            }
+        }
+
+        void WaitForUiInitialization(const std::wstring& mutexName, const ChildProcess& kernel, std::stop_token deadline)
+        {
+            while (true) {
+                ThrowIfTimedOut(deadline);
+                if (!kernel.IsRunning()) {
+                    throw std::runtime_error("Staged kernel exited before its UI initialized with exit code " + std::to_string(kernel.ExitCode()) + ".");
+                }
+                const auto identity = GlobalFindAtomW(mutexName.c_str());
+                if (identity != 0) {
+                    UiSearch search{ .Identity = identity };
+                    EnumWindows(FindUiWindow, reinterpret_cast<LPARAM>(&search));
+                    if (search.Window) {
+                        // Root_Loaded starts the asynchronous session initialization after this identity appears.
+                        // Give that initial empty-specification push a bounded interval to finish before testing.
+                        SleepWithDeadline(std::chrono::duration_cast<std::chrono::milliseconds>(kUiInitializationDelay), deadline);
+                        return;
+                    }
+                }
+                std::this_thread::sleep_for(50ms);
+            }
         }
 
         void ThrowIfKernelExited(const ChildProcess& kernel)
         {
-            if (!kernel.IsRunning()) throw std::runtime_error("Staged kernel exited before overlay smoke completed.");
+            if (!kernel.IsRunning()) {
+                throw std::runtime_error("Staged kernel exited before overlay smoke completed with exit code " + std::to_string(kernel.ExitCode()) + ".");
+            }
         }
 
         void CheckKernelEvents(const std::atomic_bool& failed, std::mutex& failureMutex, const std::string& failure)
@@ -284,9 +392,18 @@ namespace pmon::ui::tests
         }
 
         void Run(const std::filesystem::path& presenterExecutable, const std::filesystem::path& kernelExecutable,
-            const std::filesystem::path& apiDll, const std::filesystem::path& reportPath,
-            const std::filesystem::path& dataDirectory, const std::wstring& runId, DWORD timeoutMilliseconds)
+            const std::filesystem::path& apiDll, const std::filesystem::path& dataDirectory,
+            const std::wstring& runId, DWORD timeoutMilliseconds)
         {
+            const auto timeoutDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMilliseconds);
+            std::stop_source deadlineSource;
+            std::jthread deadlineWatchdog([&](std::stop_token stop) {
+                while (!stop.stop_requested() && std::chrono::steady_clock::now() < timeoutDeadline) {
+                    std::this_thread::sleep_for(25ms);
+                }
+                if (!stop.stop_requested()) deadlineSource.request_stop();
+            });
+            const auto deadline = deadlineSource.get_token();
             if (!std::filesystem::is_regular_file(presenterExecutable)) throw std::runtime_error("PresentBench executable is missing.");
             if (!std::filesystem::is_regular_file(kernelExecutable)) throw std::runtime_error("Staged PresentMon executable is missing.");
             if (!std::filesystem::is_regular_file(apiDll)) throw std::runtime_error("Staged PresentMon API DLL is missing.");
@@ -302,7 +419,7 @@ namespace pmon::ui::tests
             std::filesystem::create_directories(dataDirectory);
             const auto suffix = MakeSuffix(runId);
             const auto controlPipe = L"\\\\.\\pipe\\pm-overlay-smoke-" + suffix;
-            const auto sharedMemory = L"Global\\pm-overlay-smoke-" + suffix;
+            const auto sharedMemory = L"pm-overlay-smoke-" + suffix;
             const auto etwSession = L"pm-overlay-smoke-" + suffix;
             const auto mutexName = L"OverlaySmokeUi-" + suffix;
             const auto logDirectory = dataDirectory / "logs";
@@ -310,11 +427,11 @@ namespace pmon::ui::tests
             std::filesystem::create_directories(logDirectory);
             std::filesystem::create_directories(serviceLogDirectory);
 
-            KillOnCloseJob job;
+            OverlaySmokeCleanup cleanup(etwSession);
             ChildProcess presenter;
             ChildProcess kernel;
-            presenter.Start(Quote(presenterExecutable) + L" /width=320 /height=240", presenterExecutable.parent_path(), job);
-            std::this_thread::sleep_for(500ms);
+            presenter.Start(Quote(presenterExecutable) + L" /width=320 /height=240", presenterExecutable.parent_path(), cleanup.Job());
+            SleepWithDeadline(500ms, deadline);
             if (!presenter.IsRunning()) throw std::runtime_error("PresentBench exited before overlay smoke started.");
 
             const auto kernelCommand = Quote(kernelExecutable)
@@ -325,21 +442,22 @@ namespace pmon::ui::tests
                 + L" --ui-mutex-name " + Quote(mutexName)
                 + L" --ui-data-directory " + Quote(dataDirectory)
                 + L" --svc-option log-dir " + Quote(serviceLogDirectory)
-                + L" --duplicate-ui-response no --files-working --log-folder " + Quote(logDirectory.wstring());
-            kernel.Start(kernelCommand, kernelExecutable.parent_path(), job);
+                + L" --duplicate-ui-response no --files-working --log-level Debug --log-folder " + Quote(logDirectory.wstring());
+            kernel.Start(kernelCommand, kernelExecutable.parent_path(), cleanup.Job());
             const auto kernelPid = kernel.Id();
             const auto actionPipe = "ipm-cef-channel-" + std::to_string(kernelPid);
+            WaitForUiInitialization(mutexName, kernel, deadline);
 
             std::unique_ptr<interop::KernelClient> client;
-            const auto connectDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMilliseconds);
             std::exception_ptr lastConnectError;
-            while (std::chrono::steady_clock::now() < connectDeadline) {
+            while (!deadline.stop_requested()) {
                 ThrowIfKernelExited(kernel);
                 try {
-                    client = interop::KernelClient::Connect(actionPipe);
+                    client = interop::KernelClient::Connect(actionPipe, deadline);
                     break;
                 }
                 catch (...) {
+                    ThrowIfTimedOut(deadline);
                     lastConnectError = std::current_exception();
                     std::this_thread::sleep_for(100ms);
                 }
@@ -377,23 +495,24 @@ namespace pmon::ui::tests
                 }
             });
 
-            const auto intro = client->Introspect();
+            const auto intro = client->Introspect(deadline);
             const auto specification = LoadBasicSpecification(dataDirectory, presetDirectory, (int)presenter.Id(), intro);
-            client->PushSpecification(specification);
+            client->PushSpecification(specification, deadline);
 
             HWND overlay = nullptr;
-            const auto appearDeadline = std::chrono::steady_clock::now() + kOverlayAppearTimeout;
-            while (std::chrono::steady_clock::now() < appearDeadline) {
+            const auto appearDeadline = (std::min)(std::chrono::steady_clock::now() + kOverlayAppearTimeout, timeoutDeadline);
+            while (std::chrono::steady_clock::now() < appearDeadline && !deadline.stop_requested()) {
                 CheckKernelEvents(eventFailure, eventFailureMutex, eventFailureText);
                 ThrowIfKernelExited(kernel);
                 overlay = FindOverlayWindowForKernel(kernelPid);
                 if (overlay) break;
                 std::this_thread::sleep_for(100ms);
             }
+            ThrowIfTimedOut(deadline);
             if (!overlay) throw std::runtime_error("Staged kernel did not create a visible overlay window.");
 
             const auto stableDeadline = std::chrono::steady_clock::now() + kOverlayStableDuration;
-            while (std::chrono::steady_clock::now() < stableDeadline) {
+            while (std::chrono::steady_clock::now() < stableDeadline && !deadline.stop_requested()) {
                 CheckKernelEvents(eventFailure, eventFailureMutex, eventFailureText);
                 ThrowIfKernelExited(kernel);
                 if (!IsWindow(overlay) || !IsWindowVisible(overlay) || FindOverlayWindowForKernel(kernelPid) != overlay) {
@@ -401,14 +520,16 @@ namespace pmon::ui::tests
                 }
                 std::this_thread::sleep_for(100ms);
             }
+            ThrowIfTimedOut(deadline);
 
-            client->PushSpecification(core::Specification{});
+            client->PushSpecification(core::Specification{}, deadline);
             eventReader.request_stop();
             eventReader.join();
             client->Close();
-            job.Terminate();
+            cleanup.Terminate();
             presenter.WaitForExit(5000);
             kernel.WaitForExit(5000);
+            cleanup.StopTraceSession();
         }
     }
 
@@ -423,7 +544,7 @@ namespace pmon::ui::tests
         try {
             const auto timeoutSeconds = wcstoul(argv[7], nullptr, 10);
             if (!timeoutSeconds || timeoutSeconds > 180) throw std::invalid_argument("Timeout must be between one and 180 seconds.");
-            Run(argv[1], argv[2], argv[3], reportPath, argv[5], report.RunId, (DWORD)(timeoutSeconds * 1000));
+            Run(argv[1], argv[2], argv[3], argv[5], report.RunId, (DWORD)(timeoutSeconds * 1000));
             report.Steps = { "presenter-started", "kernel-connected", "basic-spec-pushed", "overlay-visible", "overlay-stable", "cleanup" };
             report.Complete = true;
         }

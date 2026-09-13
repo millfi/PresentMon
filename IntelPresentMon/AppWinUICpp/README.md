@@ -23,8 +23,12 @@ runtime.
 The core checks are built as
 `build\Debug\ui-tests\PresentMonUI.Core.Tests.exe`. `-RunTests` runs the native
 core and protocol checks, backdrop smoke, shell smoke, and installer-harvest
-validator checks. The project also supports `-RestoreOnly` for bootstrap and
-`-SkipRestore` for repeat local builds.
+validator checks. `build-capture-app.ps1 -RunNativeTests` additionally runs the
+real overlay host after building the staged kernel and API. It uses a generated
+child-service session, isolated UI data and logs, and a PresentBench target;
+the Basic overlay must remain visible for five seconds. The project also
+supports `-RestoreOnly` for bootstrap and `-SkipRestore` for repeat local
+builds.
 
 ## Structure
 
@@ -87,6 +91,8 @@ Development runs with `--files-working` use the working directory for settings
 and captures. The UI displays the capture directory selected by the native
 kernel. Launching the UI directly provides disconnected layout inspection;
 capture and editing controls require a connected kernel and available service.
+A normal kernel launch uses the installed service, while `--svc-as-child`
+launches a staged child service for development or isolated smoke testing.
 
 The title bar uses a Grid, icon, caption, and `Window.SetTitleBar`. The native
 backdrop smoke test covers theme changes, minimize and restore, backdrop

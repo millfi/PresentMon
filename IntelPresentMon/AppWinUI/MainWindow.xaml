@@ -31,6 +31,21 @@
                         IsPaneOpen="True" SelectionChanged="Navigation_SelectionChanged"
                         PaneOpened="Navigation_PaneChanged" PaneClosed="Navigation_PaneChanged"
                         DisplayModeChanged="Navigation_DisplayModeChanged">
+            <NavigationView.Resources>
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <ResourceDictionary x:Key="Default">
+                            <StaticResource x:Key="NavigationViewContentBackground" ResourceKey="SolidBackgroundFillColorBaseBrush" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="Light">
+                            <StaticResource x:Key="NavigationViewContentBackground" ResourceKey="SolidBackgroundFillColorBaseBrush" />
+                        </ResourceDictionary>
+                        <ResourceDictionary x:Key="HighContrast">
+                            <StaticResource x:Key="NavigationViewContentBackground" ResourceKey="SolidBackgroundFillColorBaseBrush" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+            </NavigationView.Resources>
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="Overview" Tag="Overview" AutomationProperties.AutomationId="NavOverview">
                     <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
@@ -98,7 +113,7 @@
                 </Grid>
             </Grid>
         </NavigationView>
-        <Border Grid.Row="2" Background="{ThemeResource LayerFillColorDefaultBrush}"
+        <Border Grid.Row="2" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="16,10">
             <Grid ColumnSpacing="20" RowSpacing="4">
                 <Grid.ColumnDefinitions>

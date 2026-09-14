@@ -9,10 +9,16 @@ installer workflow.
 `PresentMonUI.vcxproj` targets x64 and uses C++/WinRT, Windows App SDK 2.0.1,
 Windows C++/WinRT 2.0.240405.15, and Windows SDK BuildTools 10.0.26100.4948.
 The native package references require Visual Studio 2026 18.7 or newer with the
-v145 toolset; 18.9 is the validated toolchain. It creates an unpackaged,
-self-contained Windows App SDK deployment. The complete `ui` directory must
+v145 toolset; 18.9 is the validated toolchain. Developer builds create an unpackaged,
+self-contained Windows App SDK deployment. The complete development `ui` directory must
 remain beside `PresentMon.exe`, and it does not deploy or require the .NET
 runtime.
+
+The installer builds with `PresentMonMsix=true` into `build\Release\msix-ui`
+using separate intermediates. That build is framework-dependent and runs from
+the MSIX with Microsoft's shared Windows App SDK and VCLibs frameworks. See
+[MSIX deployment](../PMInstaller/README.md). It does not copy the framework's
+WinUI, DirectML or ONNX Runtime binaries into the app package.
 
 ## Build and test
 

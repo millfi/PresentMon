@@ -19,8 +19,12 @@
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>false</EnableMsixTooling>
     <AppxPackage>false</AppxPackage>
-    <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsPackageType Condition="'$(PresentMonMsix)'!='true'">None</WindowsPackageType>
+    <WindowsPackageType Condition="'$(PresentMonMsix)'=='true'">MSIX</WindowsPackageType>
+    <WindowsAppSDKSelfContained Condition="'$(PresentMonMsix)'!='true'">true</WindowsAppSDKSelfContained>
+    <WindowsAppSDKSelfContained Condition="'$(PresentMonMsix)'=='true'">false</WindowsAppSDKSelfContained>
+    <WindowsAppSdkBootstrapInitialize Condition="'$(PresentMonMsix)'=='true'">false</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSdkUndockedRegFreeWinRTInitialize Condition="'$(PresentMonMsix)'=='true'">false</WindowsAppSdkUndockedRegFreeWinRTInitialize>
     <EnableNativePackageReferenceSupport>true</EnableNativePackageReferenceSupport>
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
     <CppWinRTOptimized>true</CppWinRTOptimized>
@@ -41,6 +45,8 @@
     <TargetName>PresentMonUI</TargetName>
     <OutDir>$(MSBuildThisFileDirectory)..\..\build\$(Configuration)\ui\</OutDir>
     <IntDir>$(MSBuildThisFileDirectory)..\..\build\obj\PresentMonUICpp-$(Platform)-$(Configuration)\</IntDir>
+    <OutDir Condition="'$(PresentMonMsix)'=='true'">$(MSBuildThisFileDirectory)..\..\build\$(Configuration)\msix-ui\</OutDir>
+    <IntDir Condition="'$(PresentMonMsix)'=='true'">$(MSBuildThisFileDirectory)..\..\build\obj\PresentMonUICpp-$(Platform)-$(Configuration)-MSIX\</IntDir>
     <GeneratedFilesDir>$(IntDir)Generated Files\</GeneratedFilesDir>
     <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
     <VcpkgEnabled>false</VcpkgEnabled>
@@ -83,6 +89,13 @@
     <Content Include="Assets\AppIcon.ico;Assets\AppIcon.png"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="ExportMsixFramework" AfterTargets="Build" Condition="'$(PresentMonMsix)'=='true'">
+    <ItemGroup>
+      <PresentMonFramework Include="@(AppxPackageRegistration)" Condition="'%(AppxPackageRegistration.Architecture)'=='x64' and '%(AppxPackageRegistration.WindowsAppSDK)'=='true'" />
+    </ItemGroup>
+    <Error Condition="'@(PresentMonFramework)'==''" Text="The Windows App SDK framework package was not resolved." />
+    <WriteLinesToFile File="$(OutDir)framework-package.txt" Lines="@(PresentMonFramework->'%(FullPath)')" Overwrite="true" />
+  </Target>
   <Target Name="RemoveDuplicateNativeInitializers" BeforeTargets="WarnCompileDuplicatedFilename;ClCompile">
     <RemoveDuplicates Inputs="@(ClCompile)"><Output TaskParameter="Filtered" ItemName="UniqueCompile" /></RemoveDuplicates>
     <ItemGroup><ClCompile Remove="@(ClCompile)" /><ClCompile Include="@(UniqueCompile)" /></ItemGroup>

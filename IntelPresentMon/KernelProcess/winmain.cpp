@@ -570,7 +570,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 				if (opt.uiDataDirectory) {
 					args.append_range(std::vector{ "--data-directory"s, *opt.uiDataDirectory });
 				}
-				// Launch the unpackaged WinUI application with its self-contained runtime.
+				// Launch the WinUI control panel beside the kernel in either deployment model.
 				auto uiChild = [&] {
 					// WORKAROUND: keep a relative exe name while forcing install-dir cwd for child startup.
 					// Remove this when our Boost.Process version no longer breaks cli args for absolute exe paths.

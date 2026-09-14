@@ -5,6 +5,7 @@ param(
     [switch]$RestoreOnly,
     [switch]$SkipRestore,
     [switch]$RunTests,
+    [switch]$Msix,
     [string]$VisualStudioPath,
     [string]$PlatformToolset
 )
@@ -57,6 +58,8 @@ try {
         "/m:1", "/nr:false", "/nologo", "/verbosity:minimal", "/p:CL_MPCount=4", "/p:Configuration=$Configuration", "/p:Platform=x64",
         "/p:PlatformToolset=$PlatformToolset", "/p:SolutionDir=$repoRoot\\"
     )
+    if ($Msix) { $arguments += '/p:PresentMonMsix=true' }
+    if ($Msix -and $RunTests) { throw 'Use test-msix-package.ps1 for packaged builds; unpackaged smoke tests require the development UI.' }
     if ($RestoreOnly) {
         Invoke-Checked $msbuild (@($uiProject, "/t:Restore") + $arguments)
     }

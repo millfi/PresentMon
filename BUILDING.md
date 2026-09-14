@@ -10,7 +10,7 @@
 
 - [CMake](https://cmake.org)
 
-- [WiX 3 build tools](https://wixtoolset.org/docs/wix3/) (only for the MSI installer). The command-line build supports portable WiX 3.14.1 tools and does not require the Visual Studio extension.
+- Windows SDK MakeAppx, MakePri, SignTool and the x64 retail VCLibs Desktop framework (for MSIX packaging).
 
 Note: if you only want to build the PresentData library, or the PresentMon Console application
 you only need Visual Studio.  Ignore the other build and source dependency instructions and build
@@ -71,19 +71,19 @@ For an optimized local Release build without certificate setup or signing, expli
 
 `-UnsignedRelease` is accepted only with `-Configuration Release`. It forwards `/p:UnsignedRelease=true` to native MSBuild, skips the kernel's signing step, and sets its manifest to `uiAccess=false`. Release optimization and `NDEBUG` remain enabled. The default Release workflow retains signing and `uiAccess=true`; omitting the switch preserves that behavior. This switch does not create or trust certificates, install the MSI, or change Windows security settings. To opt in when directly invoking MSBuild for a Release application or solution build, pass `/p:UnsignedRelease=true`.
 
-To create a local Release MSI without certificate setup, run:
+To build and validate a local unsigned Release MSIX without certificate setup, run:
 
 ```powershell
 > .\Tools\build-installer.ps1 -UnsignedRelease
 ```
 
-The helper selects the Visual Studio 2026 `v145` toolset, builds the capture application, provider, console, and installer extension, then packages and validates `build\Release\en-us\PresentMon.msi`. Use `-SkipRestore` after dependencies have been restored and `-RunNativeTests` to include the capture application's tests. Omit `-UnsignedRelease` for the existing signed kernel workflow, which requires the test certificate described above. The helper creates the MSI; it does not install it or change the installed service.
+The helper builds the capture application, provider, console and SDK loader, then builds an isolated framework-dependent UI and validates the MSIX. `build\Release\MSIX\latest-package.txt` points to the most recent successful package. Use `-SkipRestore` after restore and `-RunNativeTests` for the capture tests. The unsigned package is for validation; Windows requires a trusted signature to install it. See [MSIX deployment](IntelPresentMon/PMInstaller/README.md) for signing, offline installation, MSI migration and size accounting.
 
-WiX discovery checks `WIX`, the portable tools at `build\tools\wix3.14.1\bin`, and standard WiX 3 installation directories. For another location, pass `-WixDirectory C:\path\to\wix\bin` (the directory containing `wix.targets`, `candle.exe`, and `light.exe`). The helper supplies the WiX paths to every packaging build, including the binder extension. `bootstrap.ps1` restores WinUI packages and auxiliary data; it does not install WiX.
+The installer uses Microsoft-signed Windows App SDK and VCLibs framework packages shared with other MSIX apps. DirectML and ONNX Runtime are not in the PresentMon package; they remain in Microsoft's standard framework. `Dependencies\x64` provides the original signed dependencies for offline installation. WiX is no longer required by the installer helper.
 
-When building `PresentMon.sln` directly, pass `/p:PlatformToolset=v145` and the WiX tool/targets paths explicitly, and configure vcpkg MSBuild integration. Without those overrides, legacy native project defaults request `v143` and legacy WiX projects search under the Visual Studio MSBuild directory. Prefer the installer helper for a local MSI build.
+When building native solution projects directly, pass `/p:PlatformToolset=v145` and configure vcpkg MSBuild integration. Historical WiX projects remain for legacy consumers; use `Tools\build-installer.ps1` for the current MSIX distribution.
 
-Restore the native WinUI project first with `bootstrap.ps1`. `IntelPresentMon\AppWinUICpp\PresentMonUI.vcxproj` produces an unpackaged, x64 Windows App SDK deployment under `build\Debug\ui` or `build\Release\ui`. The complete `ui` directory must stay next to `PresentMon.exe`; copying its executable alone is insufficient. The MSI harvests the native application, Windows App SDK runtime libraries, resources, and localized XAML resources. The UI payload does not require a .NET runtime. Overlay shaders, presets, and blocklists are staged by `KernelProcess` into the parent build directory.
+Restore the native WinUI project first with `bootstrap.ps1`. Normal UI builds remain unpackaged and self-contained under `build\Debug\ui` or `build\Release\ui`. The complete development `ui` directory must stay next to `PresentMon.exe`. MSIX builds use `/p:PresentMonMsix=true`, separate intermediates and `build\Release\msix-ui`; these binaries require package registration and the declared frameworks. Neither deployment requires .NET. Overlay shaders, presets and blocklists are staged by `KernelProcess`.
 
 To iterate on the UI alone:
 
@@ -120,7 +120,7 @@ For UI layout checks without capture, run `build\Debug\ui\PresentMonUI.exe` dire
 For default signed Release builds with `uiAccess=true`, either move the full Release output payload to a secure directory such as "Program Files" or "System32", or disable the secure directory check for local development. You cannot run these builds from the IDE typically. An opt-in unsigned Release build uses `uiAccess=false` and can be launched from `build\Release` with the development command shown above; it does not request UIAccess privileges. The installer is often the easier path for signed Release validation:
 
 ```bat
-> build\Release\en-us\PresentMon.msi
+> .\Tools\build-installer.ps1 -Publisher "CN=Your Publisher" -CertificateThumbprint YOUR_THUMBPRINT
 ```
 
 ### PresentMon Service

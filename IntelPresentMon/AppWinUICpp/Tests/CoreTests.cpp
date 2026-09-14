@@ -9,6 +9,8 @@
 #include "../Core/Introspection.h"
 #include "../Core/Specification.h"
 #include "../Core/StartupOptions.h"
+#include "../Core/EventLifetime.h"
+#include "../Core/UiDiagnostics.h"
 
 #include <algorithm>
 #include <chrono>
@@ -28,6 +30,59 @@ namespace pmon::ui::tests
     namespace
     {
         using namespace core;
+
+        void RetiredEventOwnersRejectLateCallbacks()
+        {
+            int calls = 0;
+            std::function<void()> late;
+            {
+                EventLifetime events;
+                late = events.Guard([&] { ++calls; });
+                late();
+                events.Invalidate();
+                late();
+            }
+            late();
+            Expect(calls == 1, "Retired or destroyed owners must reject queued events.");
+            {
+                EventLifetime events;
+                late = events.Guard([&] { ++calls; });
+            }
+            late();
+            Expect(calls == 1, "Destruction alone must invalidate callbacks.");
+        }
+
+        void DiagnosticsPreserveExceptionsAndRotate()
+        {
+            auto directory = std::filesystem::temp_directory_path() / ("PresentMonDiagnosticsTest-"
+                + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+            diagnostics::Initialize(directory.string());
+            auto path = std::filesystem::u8path(diagnostics::LogPath());
+            diagnostics::Record("test.action", {{"control", "TimeRange"}, {"old", 10.0}, {"new", 2.5}});
+            diagnostics::Exception("test.callback", (int32_t)0x80004005u, "bad function call\nsecond line");
+            std::ifstream stream(path);
+            std::string line;
+            uint64_t previous = 0;
+            bool sawAction = false, sawException = false;
+            while (std::getline(stream, line)) {
+                auto record = nlohmann::json::parse(line);
+                auto sequence = record.at("sequence").get<uint64_t>();
+                Expect(sequence > previous && record.contains("utc") && record.contains("tid"), "Diagnostics must be ordered and timestamped.");
+                previous = sequence;
+                if (record.at("event") == "test.action") sawAction = record.at("details").at("new") == 2.5;
+                if (record.at("event") == "exception") {
+                    auto const& detail = record.at("details");
+                    sawException = detail.at("hresult") == "0x80004005" && !detail.at("handlerStack").empty()
+                        && detail.at("message") == "bad function call\nsecond line";
+                }
+            }
+            stream.close();
+            Expect(sawAction && sawException, "Logs must flush actions and structured exception details before termination.");
+            for (int i = 0; i < 2300; ++i) diagnostics::Record("test.rotation", {{"padding", std::string(1024, 'x')}});
+            Expect(std::filesystem::exists(path.string() + ".previous") && std::filesystem::file_size(path) <= 2 * 1024 * 1024,
+                "Diagnostics must rotate and retain the preceding segment.");
+            std::filesystem::remove_all(directory);
+        }
 
         IntrospectionData MakeIntrospection()
         {
@@ -493,7 +548,9 @@ namespace pmon::ui::tests
 int RunCoreTests()
 {
     using namespace pmon::ui::tests;
-    return RunTest(PreferenceDefaultsUseMinimumAdapter)
+    return RunTest(RetiredEventOwnersRejectLateCallbacks)
+        + RunTest(DiagnosticsPreserveExceptionsAndRotate)
+        + RunTest(PreferenceDefaultsUseMinimumAdapter)
         + RunTest(DeviceNormalizationPreservesSelectionAndClamps)
         + RunTest(SpecificationBuildResolvesRuntimeValuesWithoutMutatingSource)
         + RunTest(UnsafeModelValuesAreRejected)

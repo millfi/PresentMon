@@ -3,6 +3,7 @@
 #include "AppSession.h"
 
 #include "../Core/AutomaticTargeting.h"
+#include "../Core/UiDiagnostics.h"
 #include "../Core/ConfigurationStore.h"
 #include "../Core/Specification.h"
 #include "../Interop/KernelClient.h"
@@ -509,6 +510,7 @@ void AppSession::Changed()
 
 void AppSession::Notify(std::string const& message) const
 {
+    diagnostics::Record("notification", {{"message", message}});
     auto callback = notification_;
     if (callback) {
         if (dispatcher_.HasThreadAccess()) {

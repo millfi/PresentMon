@@ -3,6 +3,7 @@
 
 #include "../pch.h"
 #include "FormControls.h"
+#include "../Core/UiDiagnostics.h"
 
 #include <winrt/Microsoft.UI.Xaml.Automation.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
@@ -49,15 +50,17 @@ namespace
         return text;
     }
 
-    fire_and_forget RunAsyncButton(Button button, pmon::ui::views::FormControls::AsyncCallback action)
+    fire_and_forget RunAsyncButton(Button button, pmon::ui::views::FormControls::AsyncCallback action, std::string id)
     {
         button.IsEnabled(false);
         try
         {
             co_await action();
+            pmon::ui::diagnostics::Record("button.complete", {{"control", id}});
         }
         catch (const hresult_error& error)
         {
+            pmon::ui::diagnostics::Exception(id.c_str(), error.code(), to_string(error.message()));
             auto message = TextBlock{};
             message.Text(error.message());
             message.TextWrapping(TextWrapping::Wrap);
@@ -69,6 +72,7 @@ namespace
         }
         catch (const std::exception& error)
         {
+            pmon::ui::diagnostics::Exception(id.c_str(), E_FAIL, error.what());
             auto message = TextBlock{};
             message.Text(H(error.what()));
             message.TextWrapping(TextWrapping::Wrap);
@@ -84,6 +88,32 @@ namespace
 
 namespace pmon::ui::views::FormControls
 {
+    void CommitPendingNumbers(const DependencyObject& root)
+    {
+        if (!root) return;
+        if (auto number = root.try_as<NumberBox>()) {
+            // NumberBox.Text is the committed value; its inner TextBox can still
+            // contain pending keystrokes. Use WinUI's parser and range validation.
+            auto findEditor = [](auto&& self, const DependencyObject& parent) -> TextBox {
+                if (auto editor = parent.try_as<TextBox>()) return editor;
+                for (int i = 0; i < VisualTreeHelper::GetChildrenCount(parent); ++i) {
+                    if (auto editor = self(self, VisualTreeHelper::GetChild(parent, i))) return editor;
+                }
+                return nullptr;
+            };
+            if (auto editor = findEditor(findEditor, number); editor && editor.Text() != number.Text()) {
+                diagnostics::Record("number.commit", {{"control", to_string(AutomationProperties::GetAutomationId(number))},
+                    {"previous", number.Value()}, {"input", to_string(editor.Text()).substr(0, 128)}});
+                number.Text(editor.Text());
+            }
+            return;
+        }
+        // Take a snapshot: a callback may update the visual tree.
+        std::vector<DependencyObject> children;
+        for (int i = 0; i < VisualTreeHelper::GetChildrenCount(root); ++i) children.push_back(VisualTreeHelper::GetChild(root, i));
+        for (auto const& child : children) CommitPendingNumbers(child);
+    }
+
     Border Row(const std::string& title, const std::string& description, const UIElement& control)
     {
         auto border = Microsoft::UI::Xaml::Markup::XamlReader::Load(LR"(
@@ -188,9 +218,12 @@ namespace pmon::ui::views::FormControls
         toggle.MinWidth(100.0);
         Identify(toggle, id, name);
         auto weak = make_weak(toggle);
-        toggle.Toggled([changed, weak](const IInspectable&, const IInspectable&)
+        toggle.Toggled([changed, weak, id](const IInspectable&, const IInspectable&)
         {
-            if (auto control = weak.get()) changed(control.IsOn());
+            if (auto control = weak.get()) {
+                diagnostics::Record("toggle.change", {{"control", id}, {"value", control.IsOn()}});
+                changed(control.IsOn());
+            }
         });
         return toggle;
     }
@@ -210,7 +243,7 @@ namespace pmon::ui::views::FormControls
         number.MinWidth(120.0);
         Identify(number, id, name);
         auto previous = std::make_shared<double>(number.Value());
-        number.ValueChanged([changed, previous](const NumberBox& control, const NumberBoxValueChangedEventArgs& args)
+        number.ValueChanged([changed, previous, id](const NumberBox& control, const NumberBoxValueChangedEventArgs& args)
         {
             if (!std::isfinite(args.NewValue()))
             {
@@ -218,7 +251,16 @@ namespace pmon::ui::views::FormControls
                 return;
             }
             *previous = args.NewValue();
-            changed(args.NewValue());
+            diagnostics::Record("number.change", {{"control", id}, {"old", args.OldValue()}, {"new", args.NewValue()}});
+            try { changed(args.NewValue()); }
+            catch (const hresult_error& error) {
+                diagnostics::Exception(id.c_str(), error.code(), to_string(error.message()));
+                throw;
+            }
+            catch (const std::exception& error) {
+                diagnostics::Exception(id.c_str(), E_FAIL, error.what());
+                throw;
+            }
         });
         return number;
     }
@@ -233,9 +275,12 @@ namespace pmon::ui::views::FormControls
         text.HorizontalAlignment(HorizontalAlignment::Stretch);
         Identify(text, id, name);
         auto weak = make_weak(text);
-        text.TextChanged([changed, weak](const IInspectable&, const TextChangedEventArgs&)
+        text.TextChanged([changed, weak, id](const IInspectable&, const TextChangedEventArgs&)
         {
-            if (auto control = weak.get()) changed(to_string(control.Text()));
+            if (auto control = weak.get()) {
+                diagnostics::Record("text.change", {{"control", id}, {"length", control.Text().size()}});
+                changed(to_string(control.Text()));
+            }
         });
         return text;
     }
@@ -251,9 +296,12 @@ namespace pmon::ui::views::FormControls
         combo.SelectedIndex(selectedIndex >= 0 && selectedIndex < (int)options.size() ? selectedIndex : -1);
         Identify(combo, id, name);
         auto weak = make_weak(combo);
-        combo.SelectionChanged([changed, weak](const IInspectable&, const SelectionChangedEventArgs&)
+        combo.SelectionChanged([changed, weak, id](const IInspectable&, const SelectionChangedEventArgs&)
         {
-            if (auto control = weak.get(); control && control.SelectedIndex() >= 0) changed(control.SelectedIndex());
+            if (auto control = weak.get(); control && control.SelectedIndex() >= 0) {
+                diagnostics::Record("choice.change", {{"control", id}, {"index", control.SelectedIndex()}});
+                changed(control.SelectedIndex());
+            }
         });
         return combo;
     }
@@ -293,8 +341,9 @@ namespace pmon::ui::views::FormControls
             picker.MinWidth(240.0);
             picker.MaxWidth(320.0);
             Identify(picker, id + "Picker", name);
-            picker.ColorChanged([swatchWeak, labelWeak, changed](const ColorPicker&, const ColorChangedEventArgs& args)
+            picker.ColorChanged([swatchWeak, labelWeak, changed, id](const ColorPicker&, const ColorChangedEventArgs& args)
             {
+                diagnostics::Record("color.change", {{"control", id}, {"value", Hex(args.NewColor())}});
                 if (auto swatch = swatchWeak.get()) swatch.Background(SolidColorBrush{ args.NewColor() });
                 if (auto label = labelWeak.get()) label.Text(H(Hex(args.NewColor())));
                 changed(args.NewColor());
@@ -311,8 +360,9 @@ namespace pmon::ui::views::FormControls
         button.Content(box_value(H(text)));
         button.HorizontalAlignment(HorizontalAlignment::Left);
         Identify(button, id, text);
-        button.Click([action](const IInspectable&, const RoutedEventArgs&)
+        button.Click([action, id](const IInspectable&, const RoutedEventArgs&)
         {
+            diagnostics::Record("button.invoke", {{"control", id}});
             action();
         });
         return button;
@@ -325,9 +375,10 @@ namespace pmon::ui::views::FormControls
         button.HorizontalAlignment(HorizontalAlignment::Left);
         Identify(button, id, text);
         auto weak = make_weak(button);
-        button.Click([weak, action](const IInspectable&, const RoutedEventArgs&)
+        button.Click([weak, action, id](const IInspectable&, const RoutedEventArgs&)
         {
-            if (auto control = weak.get()) RunAsyncButton(control, action);
+            diagnostics::Record("button.invoke", {{"control", id}});
+            if (auto control = weak.get()) RunAsyncButton(control, action, id);
         });
         return button;
     }

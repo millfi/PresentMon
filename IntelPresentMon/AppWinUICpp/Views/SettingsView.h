@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Intel Corporation
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Core/EventLifetime.h"
 
 #include <winrt/Microsoft.UI.Xaml.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
@@ -31,6 +32,8 @@ namespace pmon::ui::views
             const core::IntrospectionData& introspection, std::function<void()> changed,
             AsyncCallback editHotkeys, AsyncCallback resetPreferences, ExploreFolderCallback exploreFolder,
             AppInfo appInfo, bool enableDevOptions);
+        ~SettingsView() { Deactivate(); }
+        void Deactivate() noexcept { events_.Invalidate(); }
 
         winrt::Microsoft::UI::Xaml::UIElement Element() const;
 
@@ -42,7 +45,8 @@ namespace pmon::ui::views
         void BuildLogging();
         void BuildOther();
         void BuildAbout(const AppInfo& appInfo);
-        winrt::Windows::Foundation::IAsyncAction ConfirmResetAsync();
+        static winrt::Windows::Foundation::IAsyncAction ConfirmResetAsync(
+            winrt::weak_ref<winrt::Microsoft::UI::Xaml::Controls::StackPanel> layout, AsyncCallback resetPreferences);
         void AddToggle(const std::string& id, const std::string& title, const std::string& description,
             bool value, std::function<void(bool)> setter);
         void AddNumber(const std::string& id, const std::string& title, const std::string& description,
@@ -58,6 +62,7 @@ namespace pmon::ui::views
         void Update(std::function<void()> setter);
 
         core::Preferences& preferences_;
+        core::EventLifetime events_;
         const core::IntrospectionData& introspection_;
         std::function<void()> changed_;
         AsyncCallback editHotkeys_;

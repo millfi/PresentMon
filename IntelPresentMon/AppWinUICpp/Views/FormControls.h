@@ -14,6 +14,8 @@
 namespace pmon::ui::views::FormControls
 {
     using AsyncCallback = std::function<winrt::Windows::Foundation::IAsyncAction()>;
+    // Validate pending NumberBox editor text while its page still owns callbacks.
+    void CommitPendingNumbers(const winrt::Microsoft::UI::Xaml::DependencyObject& root);
 
     winrt::Microsoft::UI::Xaml::Controls::Border Row(const std::string& title,
         const std::string& description, const winrt::Microsoft::UI::Xaml::UIElement& control);

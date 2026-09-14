@@ -4,6 +4,7 @@
 #include "MainWindow.xaml.h"
 #include "ThinAcrylicBackdrop.h"
 #include "Core/StartupOptions.h"
+#include "Core/UiDiagnostics.h"
 #include "Tests/UiSmoke.h"
 #include <shellapi.h>
 #include <filesystem>
@@ -15,6 +16,7 @@ namespace winrt::PresentMon::UI::implementation
     App::App()
     {
         UnhandledException([this](auto const&, Microsoft::UI::Xaml::UnhandledExceptionEventArgs const& args) {
+            pmon::ui::diagnostics::Exception("unhandled UI exception", args.Exception(), to_string(args.Message()));
             Log("Unhandled UI exception: " + to_string(args.Message()));
         });
         InitializeComponent();
@@ -48,6 +50,8 @@ namespace winrt::PresentMon::UI::implementation
                 return;
             }
             auto const options = pmon::ui::services::StartupOptions::Parse(startup);
+            logDirectory_ = options.LogDirectory;
+            pmon::ui::diagnostics::Initialize(logDirectory_);
             if (shellSmoke) {
                 if (reportPath.empty() || runId.empty() || options.PipeName.empty()) {
                     throw std::invalid_argument("Shell smoke requires a mock pipe, report path and run ID.");
@@ -77,6 +81,7 @@ namespace winrt::PresentMon::UI::implementation
             window_.Activate();
         }
         catch (hresult_error const& error) {
+            pmon::ui::diagnostics::Exception("startup", error.code(), to_string(error.message()));
             Log("Startup failure: " + to_string(error.message()));
             ReleaseMutex();
             ExitCode = 1;
@@ -84,6 +89,7 @@ namespace winrt::PresentMon::UI::implementation
             Exit();
         }
         catch (std::exception const& error) {
+            pmon::ui::diagnostics::Exception("startup", E_FAIL, error.what());
             Log(std::string("Startup failure: ") + error.what());
             ReleaseMutex();
             ExitCode = 1;
@@ -175,6 +181,7 @@ namespace winrt::PresentMon::UI::implementation
 
     void App::Log(std::string const& message) noexcept
     {
+        pmon::ui::diagnostics::Record("application.message", {{"message", message}});
         OutputDebugStringA((message + "\n").c_str());
         if (logDirectory_.empty()) return;
         try {

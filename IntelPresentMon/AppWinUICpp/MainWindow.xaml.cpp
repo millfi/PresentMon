@@ -8,6 +8,7 @@
 #include "Core/ConfigModels.h"
 #include "Core/ConfigurationJson.h"
 #include "Core/StartupOptions.h"
+#include "Core/UiDiagnostics.h"
 #include "Services/AppSession.h"
 #include "Services/WindowsServices.h"
 #include "Views/FormControls.h"
@@ -23,6 +24,7 @@
 #include <winrt/Microsoft.UI.Xaml.Automation.Provider.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.Pickers.h>
 
@@ -206,7 +208,28 @@ IAsyncAction MainWindow::RunShellSmokeAsync()
     if (session_->Preferences().GraphFont.AxisSize != changedAxisSize) {
         throw hresult_error(E_FAIL, L"Nested graph-font control did not update session preferences.");
     }
+    // Keep the old NumberBox alive just as focus/queued XAML events can do.
+    auto timeRange = (co_await waitFor(L"TimeRange")).as<NumberBox>();
+    timeRange.StartBringIntoView();
+    co_await resume_after(std::chrono::milliseconds(100));
+    co_await pmon::ui::ResumeForeground{dispatcher};
+    auto findInput = [](auto&& self, DependencyObject const& parent) -> TextBox {
+        if (auto input = parent.try_as<TextBox>()) return input;
+        for (int i = 0; i < VisualTreeHelper::GetChildrenCount(parent); ++i) {
+            if (auto input = self(self, VisualTreeHelper::GetChild(parent, i))) return input;
+        }
+        return nullptr;
+    };
+    auto input = findInput(findInput, timeRange);
+    if (!input || !input.Focus(FocusState::Keyboard)) throw hresult_error(E_FAIL, L"Time scale editor could not take focus.");
+    input.Text(L"2.5");
+    if (timeRange.Value() != 10.0) throw hresult_error(E_FAIL, L"Regression test must start with uncommitted text.");
     co_await navigate(L"Data", L"Data processing");
+    co_await resume_after(std::chrono::milliseconds(100));
+    co_await pmon::ui::ResumeForeground{dispatcher};
+    if (session_->Preferences().TimeRange != 2.5) throw hresult_error(E_FAIL, L"Navigation lost the pending Time scale edit.");
+    timeRange.Value(7.0);
+    if (session_->Preferences().TimeRange != 2.5) throw hresult_error(E_FAIL, L"A retired page callback changed preferences.");
     auto pollRate = (co_await waitFor(L"MetricPollRate")).try_as<NumberBox>();
     if (!pollRate) {
         throw hresult_error(E_FAIL, L"Metric poll-rate control has the wrong type.");
@@ -243,7 +266,8 @@ IAsyncAction MainWindow::RunShellSmokeAsync()
     };
     auto persistedPreferences = pmon::ui::core::PreferenceDocument::Parse(read(preferencesPath), session_->Introspection());
     if (persistedPreferences.Preferences.GraphFont.AxisSize != changedAxisSize
-        || persistedPreferences.Preferences.MetricPollRate != changedRate) {
+        || persistedPreferences.Preferences.MetricPollRate != changedRate
+        || persistedPreferences.Preferences.TimeRange != 2.5) {
         throw hresult_error(E_FAIL, L"Autosaved preferences do not contain shell control edits.");
     }
     auto persistedLoadout = pmon::ui::core::LoadoutDocument::Parse(read(loadoutPath), session_->Introspection(),
@@ -251,10 +275,24 @@ IAsyncAction MainWindow::RunShellSmokeAsync()
     if (persistedLoadout.Widgets.empty()) {
         throw hresult_error(E_FAIL, L"Autosaved custom loadout does not contain the added graph.");
     }
+    if (session_->Preferences().TimeRange != 2.5) throw hresult_error(E_FAIL, L"Time scale edit did not survive navigation.");
+    std::ifstream trace(std::filesystem::u8path(pmon::ui::diagnostics::LogPath()));
+    std::string entry;
+    bool sawCommit = false, sawChange = false, sawNavigation = false;
+    while (std::getline(trace, entry)) {
+        auto record = nlohmann::json::parse(entry);
+        auto const event = record.at("event").get<std::string>();
+        auto const& details = record.at("details");
+        if (event == "number.commit" && details.value("control", "") == "TimeRange") sawCommit = true;
+        if (event == "number.change" && details.value("control", "") == "TimeRange" && details.at("new") == 2.5) sawChange = sawCommit;
+        if (event == "navigation.complete" && details.value("page", "") == "Data" && sawChange) sawNavigation = true;
+    }
+    if (!sawNavigation) throw hresult_error(E_FAIL, L"Diagnostics did not preserve the edit/navigation sequence.");
 }
 
 void MainWindow::Initialize(pmon::ui::services::StartupOptions const& options)
 {
+    pmon::ui::diagnostics::Initialize(options.LogDirectory);
     InitializeComponent();
     session_ = std::make_shared<pmon::ui::services::AppSession>(options, DispatcherQueue());
 
@@ -275,6 +313,20 @@ void MainWindow::Initialize(pmon::ui::services::StartupOptions const& options)
     AppWindow().Move({ workArea.X + (workArea.Width - width) / 2, workArea.Y + (workArea.Height - height) / 2 });
 
     auto weak = get_weak();
+    Root().AddHandler(UIElement::PointerPressedEvent(), box_value(Input::PointerEventHandler{
+        [weak](IInspectable const&, Input::PointerRoutedEventArgs const& args) {
+            if (auto self = weak.get()) {
+                auto source = args.OriginalSource().try_as<DependencyObject>();
+                while (source) {
+                    auto id = AutomationProperties::GetAutomationId(source);
+                    if (!id.empty()) {
+                        pmon::ui::diagnostics::Record("pointer.press", {{"page", ToString(self->section_)}, {"control", ToString(id)}});
+                        break;
+                    }
+                    source = VisualTreeHelper::GetParent(source);
+                }
+            }
+        }}), true);
     session_->DocumentChanged([weak]() {
         if (auto self = weak.get()) {
             self->DispatcherQueue().TryEnqueue([weak]() {
@@ -343,6 +395,7 @@ void MainWindow::Navigation_SelectionChanged(NavigationView const&, NavigationVi
 fire_and_forget MainWindow::NavigateAsync(hstring next)
 {
     auto lifetime = get_strong();
+    pmon::ui::diagnostics::Record("navigation.request", {{"from", ToString(section_)}, {"to", ToString(next)}});
     auto const version = ++navigationVersion_;
     auto const previous = section_;
     section_ = next;
@@ -357,6 +410,7 @@ fire_and_forget MainWindow::NavigateAsync(hstring next)
         }
     }
     catch (std::exception const& error) {
+        pmon::ui::diagnostics::Exception("navigation", E_FAIL, error.what());
         if (version == navigationVersion_) {
             section_ = previous;
             RenderView();
@@ -404,6 +458,8 @@ void MainWindow::RenderView()
     captureButton_ = nullptr;
     clearTargetButton_ = nullptr;
     hotkeyButtons_.clear();
+    pmon::ui::views::FormControls::CommitPendingNumbers(ContentHost());
+    if (settingsView_) settingsView_->Deactivate();
     ContentHost().Children().Clear();
     loadoutView_.reset();
     settingsView_.reset();
@@ -445,6 +501,7 @@ void MainWindow::RenderView()
         }
     }
     UpdateState();
+    pmon::ui::diagnostics::Record("navigation.complete", {{"page", ToString(section_)}});
 }
 
 void MainWindow::SetContent(UIElement const& content)
@@ -629,6 +686,7 @@ UIElement MainWindow::BuildOverview()
 
 fire_and_forget MainWindow::RefreshProcessesAsync()
 {
+    pmon::ui::diagnostics::Record("processes.refresh");
     auto lifetime = get_strong();
     if (refreshingProcesses_) co_return;
     refreshingProcesses_ = true;
@@ -673,6 +731,7 @@ void MainWindow::FilterProcesses(AutoSuggestBox const& selector)
 
 fire_and_forget MainWindow::SelectProcessAsync(std::optional<int> pid)
 {
+    pmon::ui::diagnostics::Record("process.select", {{"pid", pid.value_or(0)}});
     auto lifetime = get_strong();
     try { co_await session_->SelectProcessAsync(pid); }
     catch (std::exception const& error) { ShowNotification(error.what()); }
@@ -680,6 +739,7 @@ fire_and_forget MainWindow::SelectProcessAsync(std::optional<int> pid)
 
 fire_and_forget MainWindow::SelectPresetAsync(int index)
 {
+    pmon::ui::diagnostics::Record("preset.select", {{"index", index}});
     auto lifetime = get_strong();
     if (index < 0 || index > 4) co_return;
     try {
@@ -690,6 +750,7 @@ fire_and_forget MainWindow::SelectPresetAsync(int index)
 
 fire_and_forget MainWindow::ToggleCaptureAsync()
 {
+    pmon::ui::diagnostics::Record("capture.toggle");
     auto lifetime = get_strong();
     try { co_await session_->ToggleCaptureAsync(); }
     catch (std::exception const& error) { ShowNotification(error.what()); }
@@ -828,6 +889,7 @@ void MainWindow::ShowNotification(std::string const& message)
 
 void MainWindow::Navigation_PaneChanged(NavigationView const& sender, IInspectable const&)
 {
+    pmon::ui::diagnostics::Record("navigation.pane", {{"open", sender.IsPaneOpen()}});
     if (auto appearance = AppearancePanel()) {
         appearance.Visibility(sender.IsPaneOpen() ? Visibility::Visible : Visibility::Collapsed);
     }
@@ -854,6 +916,7 @@ void MainWindow::Appearance_SelectionChanged(IInspectable const& sender, Selecti
     auto const selector = sender.try_as<ComboBox>();
     if (!root || !selector) return;
     auto const selected = selector.SelectedIndex();
+    pmon::ui::diagnostics::Record("appearance.change", {{"index", selected}});
     root.RequestedTheme(selected == 1 ? ElementTheme::Light : selected == 2 ? ElementTheme::Dark : ElementTheme::Default);
 }
 
@@ -869,6 +932,14 @@ void MainWindow::AppWindow_Closing(Microsoft::UI::Windowing::AppWindow const&, A
     if (canClose_) return;
     args.Cancel(true);
     if (!closing_) {
+        pmon::ui::diagnostics::Record("window.close.request", {{"page", ToString(section_)}});
+        try { pmon::ui::views::FormControls::CommitPendingNumbers(ContentHost()); }
+        catch (hresult_error const& error) {
+            pmon::ui::diagnostics::Exception("close.commit", error.code(), to_string(error.message()));
+            ShowNotification(to_string(error.message()));
+            return;
+        }
+        if (settingsView_) settingsView_->Deactivate();
         closing_ = true;
         if (auto pageContent = PageContent()) pageContent.IsEnabled(false);
         CloseAsync();
@@ -882,6 +953,7 @@ fire_and_forget MainWindow::CloseAsync()
     catch (std::exception const& error) { ShowNotification(std::string("Unable to finish shutdown: ") + error.what()); }
     ClearWindowIdentity();
     canClose_ = true;
+    pmon::ui::diagnostics::Record("window.close.complete");
     Close();
 }
 

@@ -129,15 +129,15 @@ namespace pmon::ui::views
             preferences_.TimeRange, 0.1, 10.0, 0.1, [this](double value) { preferences_.TimeRange = value; });
 
         auto scale = FormControls::Number("UpscaleFactor", "Graphics scaling factor", preferences_.UpscaleFactor, 1.0, 5.0, 0.1,
-            [this](double value) { Update([this, value] { preferences_.UpscaleFactor = value; }); });
+            events_.Guard([this](double value) { Update([this, value] { preferences_.UpscaleFactor = value; }); }));
         scale.IsEnabled(preferences_.Upscale);
         auto scaleControls = StackPanel{};
         scaleControls.Spacing(8.0);
-        scaleControls.Children().Append(FormControls::Toggle("Upscale", "Graphics scaling", preferences_.Upscale, [this, scale](bool value)
+        scaleControls.Children().Append(FormControls::Toggle("Upscale", "Graphics scaling", preferences_.Upscale, events_.Guard([this, scale](bool value)
         {
             scale.IsEnabled(value);
             Update([this, value] { preferences_.Upscale = value; });
-        }));
+        })));
         scaleControls.Children().Append(scale);
         layout_.Children().Append(FormControls::Row("Graphics scaling", "Enlarge overlay graphics for readability on high DPI displays. Factor ranges from 1 to 5.", scaleControls));
         AddNumber("OverlayDrawRate", "Draw rate", "Number of times the overlay is drawn per second (FPS).",
@@ -162,16 +162,16 @@ namespace pmon::ui::views
             preferences_.GraphBorder, 0.0, 20.0, 1.0, [this](double value) { preferences_.GraphBorder = value; });
         AddNumber(advanced, "GraphPadding", "Graph padding", "Space inside each graph, in pixels.",
             preferences_.GraphPadding, 0.0, 100.0, 1.0, [this](double value) { preferences_.GraphPadding = value; });
-        auto font = FormControls::Text("GraphFontName", "Graph axis font", preferences_.GraphFont.Name, [this](const std::string& value)
+        auto font = FormControls::Text("GraphFontName", "Graph axis font", preferences_.GraphFont.Name, events_.Guard([this](const std::string& value)
         {
             const auto trimmed = Trim(value);
             if (!trimmed.empty()) Update([this, trimmed] { preferences_.GraphFont.Name = trimmed; });
-        });
+        }));
         auto fontWeak = make_weak(font);
-        font.LostFocus([this, fontWeak](const IInspectable&, const RoutedEventArgs&)
+        font.LostFocus(events_.Guard([this, fontWeak](const IInspectable&, const RoutedEventArgs&)
         {
             if (auto control = fontWeak.get()) control.Text(H(preferences_.GraphFont.Name));
-        });
+        }));
         advanced.Children().Append(FormControls::Row("Graph axis font", "Font family for graph axis labels. A font name is required.", font));
         AddNumber(advanced, "GraphAxisSize", "Graph axis text size", "Size of graph axis labels, in pixels.",
             preferences_.GraphFont.AxisSize, 6.0, 48.0, 0.5, [this](double value) { preferences_.GraphFont.AxisSize = value; });
@@ -201,10 +201,10 @@ namespace pmon::ui::views
             option.IsChecked((int)preferences_.OverlayPosition == index);
             option.HorizontalAlignment(HorizontalAlignment::Stretch);
             FormControls::Identify(option, "OverlayPosition" + std::to_string(index), "Overlay position: " + labels[(size_t)index]);
-            option.Checked([this, index](const IInspectable&, const RoutedEventArgs&)
+            option.Checked(events_.Guard([this, index](const IInspectable&, const RoutedEventArgs&)
             {
                 Update([this, index] { preferences_.OverlayPosition = (core::OverlayPosition)index; });
-            });
+            }));
             Grid::SetRow(option, index / 2);
             Grid::SetColumn(option, index % 2);
             position.Children().Append(option);
@@ -228,11 +228,11 @@ namespace pmon::ui::views
                 + std::to_string(drawRate) + " FPS)."));
         };
         auto poll = FormControls::Number("MetricPollRate", "Polling rate in hertz", preferences_.MetricPollRate, 1.0, 240.0, 1.0,
-            [this, refreshPollHint](double value)
+            events_.Guard([this, refreshPollHint](double value)
         {
             Update([this, value] { preferences_.MetricPollRate = value; });
             refreshPollHint();
-        });
+        }));
         layout_.Children().Append(FormControls::Row("Polling rate", "How often to request metric data from the API, in hertz. This sets the temporal resolution of graphs and readouts.", poll));
         refreshPollHint();
         layout_.Children().Append(pollHint);
@@ -252,7 +252,7 @@ namespace pmon::ui::views
             if (adapter.Id == preferences_.AdapterId) selected = index;
         }
         auto adapterChoice = FormControls::Choice("DefaultAdapter", "Default graphics adapter", adapterNames, selected,
-            [this](int index) { Update([this, index] { preferences_.AdapterId = introspection_.Adapters[(size_t)index].Id; }); });
+            events_.Guard([this](int index) { Update([this, index] { preferences_.AdapterId = introspection_.Adapters[(size_t)index].Id; }); }));
         layout_.Children().Append(FormControls::Row("Default adapter", adapterNames.empty()
             ? "No graphics adapters are currently available. Connect to the PresentMon service to enumerate devices."
             : "GPU used for new loadout rows, frame queries, and metrics that follow the global adapter.", adapterChoice));
@@ -261,14 +261,14 @@ namespace pmon::ui::views
         auto advanced = StackPanel{};
         advanced.Spacing(12.0);
         auto period = FormControls::Number("EtwFlushPeriod", "ETW manual flush period in milliseconds", preferences_.EtwFlushPeriod, 1.0, 1000.0, 1.0,
-            [this](double value) { Update([this, value] { preferences_.EtwFlushPeriod = value; }); });
+            events_.Guard([this](double value) { Update([this, value] { preferences_.EtwFlushPeriod = value; }); }));
         period.IsEnabled(preferences_.ManualEtwFlush);
         advanced.Children().Append(FormControls::Row("Manual ETW flush", "Flush ETW buffers manually instead of relying on the default 1,000 ms timer. A service restart may be required.",
-            FormControls::Toggle("ManualEtwFlush", "Manual ETW flush", preferences_.ManualEtwFlush, [this, period](bool value)
+            FormControls::Toggle("ManualEtwFlush", "Manual ETW flush", preferences_.ManualEtwFlush, events_.Guard([this, period](bool value)
         {
             period.IsEnabled(value);
             Update([this, value] { preferences_.ManualEtwFlush = value; });
-        })));
+        }))));
         advanced.Children().Append(FormControls::Row("ETW flush period", "Time between manual flushes, in milliseconds. The metric window offset should roughly match this period.", period));
         AddNumber(advanced, "MetricsOffset", "Metric window offset", "Offset the sliding window, in milliseconds, to avoid including frames whose data has not arrived yet.",
             preferences_.MetricsOffset, 0.0, 1500.0, 1.0, [this](double value) { preferences_.MetricsOffset = value; });
@@ -284,7 +284,7 @@ namespace pmon::ui::views
         layout_.Children().Append(FormControls::Row("Capture hotkeys", "Configure keyboard shortcuts for starting a capture, showing the overlay, and cycling presets.",
             FormControls::AsyncButton("EditCaptureHotkeys", "Edit hotkeys", editHotkeys_)));
         layout_.Children().Append(FormControls::Row("Capture folder", "Open the folder containing captured metric data and summary statistics.",
-            FormControls::AsyncButton("ExploreCaptures", "Open in Explorer", [this] { return exploreFolder_("captures"); })));
+            FormControls::AsyncButton("ExploreCaptures", "Open in Explorer", [explore = exploreFolder_] { return explore("captures"); })));
     }
 
     void SettingsView::BuildLogging()
@@ -309,9 +309,9 @@ namespace pmon::ui::views
         FormControls::Identify(capture, "EtlCaptureDisabled", "ETL capture is disabled");
         layout_.Children().Append(FormControls::Row("Capture ETL", "Raw ETL capture is currently disabled.", capture));
         layout_.Children().Append(FormControls::Row("ETL folder", "Open the folder containing captured .etl trace files.",
-            FormControls::AsyncButton("ExploreEtls", "Open in Explorer", [this] { return exploreFolder_("etls"); })));
+            FormControls::AsyncButton("ExploreEtls", "Open in Explorer", [explore = exploreFolder_] { return explore("etls"); })));
         layout_.Children().Append(FormControls::Row("Application logs", "Open the folder containing PresentMon diagnostic logs.",
-            FormControls::AsyncButton("ExploreLogs", "Open in Explorer", [this] { return exploreFolder_("logs"); })));
+            FormControls::AsyncButton("ExploreLogs", "Open in Explorer", [explore = exploreFolder_] { return explore("logs"); })));
     }
 
     void SettingsView::BuildOther()
@@ -319,16 +319,19 @@ namespace pmon::ui::views
         layout_.Children().Append(FormControls::Row("Keyboard shortcuts", "Customize shortcuts for capture, overlay visibility, and preset selection.",
             FormControls::AsyncButton("EditHotkeys", "Edit hotkeys", editHotkeys_)));
         layout_.Children().Append(FormControls::Row("Target blocklist", "Open the blocklist file used to filter common applications from the target selector. Enable or disable filtering in Capture settings.",
-            FormControls::AsyncButton("ExploreBlocklist", "Open blocklist", [this] { return exploreFolder_("blocklist"); })));
+            FormControls::AsyncButton("ExploreBlocklist", "Open blocklist", [explore = exploreFolder_] { return explore("blocklist"); })));
         layout_.Children().Append(FormControls::Row("Reset preferences", "Restore preferences and keyboard shortcuts to their defaults. A confirmation is required before resetting.",
-            FormControls::AsyncButton("ResetPreferences", "Reset preferences", [this] { return ConfirmResetAsync(); })));
+            FormControls::AsyncButton("ResetPreferences", "Reset preferences", [layout = make_weak(layout_), reset = resetPreferences_] {
+                return ConfirmResetAsync(layout, reset);
+            })));
     }
 
-    IAsyncAction SettingsView::ConfirmResetAsync()
+    IAsyncAction SettingsView::ConfirmResetAsync(weak_ref<StackPanel> layout, AsyncCallback resetPreferences)
     {
-        auto resetPreferences = resetPreferences_;
+        auto panel = layout.get();
+        if (!panel || !panel.XamlRoot()) co_return;
         auto dialog = ContentDialog{};
-        dialog.XamlRoot(layout_.XamlRoot());
+        dialog.XamlRoot(panel.XamlRoot());
         dialog.Title(box_value(H("Reset preferences?")));
         dialog.Content(box_value(H("All current preferences and keyboard shortcuts will be replaced with their default values.")));
         dialog.PrimaryButtonText(H("Reset"));
@@ -380,7 +383,7 @@ namespace pmon::ui::views
         bool value, std::function<void(bool)> setter)
     {
         layout_.Children().Append(FormControls::Row(title, description, FormControls::Toggle(id, title, value,
-            [this, setter = std::move(setter)](bool next) { Update([setter, next] { setter(next); }); })));
+            events_.Guard([this, setter = std::move(setter)](bool next) { Update([setter, next] { setter(next); }); }))));
     }
 
     void SettingsView::AddNumber(const std::string& id, const std::string& title, const std::string& description,
@@ -394,14 +397,14 @@ namespace pmon::ui::views
         std::function<void(double)> setter)
     {
         panel.Children().Append(FormControls::Row(title, description, FormControls::Number(id, title, value, minimum, maximum, step,
-            [this, setter = std::move(setter)](double next) { Update([setter, next] { setter(next); }); })));
+            events_.Guard([this, setter = std::move(setter)](double next) { Update([setter, next] { setter(next); }); }))));
     }
 
     void SettingsView::AddColor(const StackPanel& panel, const std::string& id, const std::string& title,
         const std::string& description, core::RgbaColor& value, std::function<void(core::RgbaColor)> setter)
     {
         panel.Children().Append(FormControls::Row(title, description, FormControls::Color(id, title, ToColor(value),
-            [this, setter = std::move(setter)](Color next) { Update([setter, next] { setter(FromColor(next)); }); })));
+            events_.Guard([this, setter = std::move(setter)](Color next) { Update([setter, next] { setter(FromColor(next)); }); }))));
     }
 
     void SettingsView::AddExpander(const std::string& id, const std::string& title, const std::string& description,

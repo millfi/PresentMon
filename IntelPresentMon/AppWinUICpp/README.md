@@ -103,3 +103,36 @@ launches a staged child service for development or isolated smoke testing.
 The title bar uses a Grid, icon, caption, and `Window.SetTitleBar`. The native
 backdrop smoke test covers theme changes, minimize and restore, backdrop
 replacement, and close behavior on a desktop with acrylic support.
+
+## UI crash diagnostics
+
+UI actions are written synchronously as JSON Lines to
+`%LOCALAPPDATA%\FluentPresentMon\logs\PresentMonUI-actions-<pid>-<session>.jsonl`.
+The `--p2c-log-folder` override and isolated `--data-directory` runs use their
+selected log directory. This does not require ETW provider registration.
+The existing `PresentMonUI.log` continues to contain error and notification text.
+
+Each action record includes UTC time, a monotonically increasing sequence,
+process/thread IDs, and source file/function/line. Records cover menu state,
+page navigation, clicks on identified controls, numeric commits with old/new
+values, toggles, choices, colors, and common commands. Free-form text controls
+record their ID and text length rather than their contents. Numeric pending
+input is limited to 128 characters. This is an application event trail, not
+a recording of all keyboard input or of other applications.
+
+Exception records include the operation, HRESULT, message and the reporting
+handler's stack as module paths and relative addresses. The handler stack is
+not the original throw stack; retain the matching EXE/PDB and a Windows crash
+dump when the original throw site is needed. The session header identifies the
+executable, compilation time and loaded XAML runtime. Files are separate for
+each process/session so another running instance cannot interleave its events.
+Each file rotates at 2 MiB and retains one `.jsonl.previous` segment. Older
+sessions remain available in the log directory.
+
+For investigation, collect the session JSONL and its `.previous` file together
+with `PresentMonUI.log` and Windows Application Error/Windows Error Reporting
+events. Sort by `sequence` within a session and correlate `utc` and `pid` with
+the Windows crash record. `navigation.request`, `number.commit`,
+`number.change`, and `navigation.complete` describe pending edits made while
+leaving a page. The shell regression test verifies this sequence, preservation
+of a focused pending Time scale edit, and rejection of a retired page's events.

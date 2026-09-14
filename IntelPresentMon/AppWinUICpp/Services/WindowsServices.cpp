@@ -20,7 +20,7 @@
 namespace pmon::ui::services {
 namespace {
 
-constexpr wchar_t WindowIdentityProperty[] = L"IntelPresentMon.UiMutexSuffixAtom";
+constexpr wchar_t WindowIdentityProperty[] = L"FluentPresentMon.UiMutexSuffixAtom";
 constexpr uint32_t PdhMoreData = 0x800007d2u;
 constexpr uint32_t PdhNoData = 0x800007d5u;
 constexpr uint32_t PdhNoInstance = 0x800007d1u;

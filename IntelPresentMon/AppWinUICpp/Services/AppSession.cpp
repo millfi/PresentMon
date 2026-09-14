@@ -106,7 +106,7 @@ AppSession::AppSession(StartupOptions options, winrt::Microsoft::UI::Dispatching
     , store_(std::make_unique<core::ConfigurationStore>(PathFromUtf8(options_.DataDirectory),
         PathFromUtf8(options_.InstallDirectory).append("Presets")))
 {
-    appInfo_.emplace("Application", "Intel PresentMon");
+    appInfo_.emplace("Application", "Fluent PresentMon");
     appInfo_.emplace("User interface", "WinUI 3 / Windows App SDK");
     appInfo_.emplace("Architecture", sizeof(void*) == 8 ? "X64" : "X86");
 }

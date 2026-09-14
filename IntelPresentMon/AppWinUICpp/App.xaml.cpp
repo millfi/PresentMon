@@ -56,7 +56,7 @@ namespace winrt::PresentMon::UI::implementation
                 return;
             }
             logDirectory_ = options.LogDirectory;
-            auto const mutexName = to_hstring("Local\\IntelPresentMon." + options.MutexSuffix);
+            auto const mutexName = to_hstring("Local\\FluentPresentMon." + options.MutexSuffix);
             instanceMutex_.attach(CreateMutexW(nullptr, TRUE, mutexName.c_str()));
             if (!instanceMutex_) throw_last_error();
             if (GetLastError() == ERROR_ALREADY_EXISTS) {

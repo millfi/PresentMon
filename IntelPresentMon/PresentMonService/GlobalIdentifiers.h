@@ -2,8 +2,8 @@
 
 namespace pmon::gid
 {
-	inline constexpr const char* defaultControlPipeName = R"(\\.\pipe\sharedpresentmonsvcnamedpipe)";
-	inline constexpr const char* defaultLogPipeBaseName = "shared-pm2-svc-log";
-	inline constexpr const wchar_t* registryPath = LR"(SOFTWARE\INTEL\PresentMon\Service)";
+	inline constexpr const char* defaultControlPipeName = R"(\\.\pipe\fluentpresentmonsvcnamedpipe)";
+	inline constexpr const char* defaultLogPipeBaseName = "fluent-pm-svc-log";
+	inline constexpr const wchar_t* registryPath = LR"(SOFTWARE\FluentPresentMon\Service)";
 	inline constexpr const char* middlewarePathKey = "sharedMiddlewarePath";
 }

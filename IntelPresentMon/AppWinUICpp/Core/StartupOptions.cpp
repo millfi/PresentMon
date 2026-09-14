@@ -137,8 +137,8 @@ namespace pmon::ui::services
             options.AppDataDirectory = options.DataDirectory;
         }
         else {
-            options.DataDirectory = ToUtf8((KnownFolder(FOLDERID_Documents) / L"PresentMon").wstring());
-            options.AppDataDirectory = ToUtf8((KnownFolder(FOLDERID_LocalAppData) / L"Intel" / L"PresentMon").wstring());
+            options.DataDirectory = ToUtf8((KnownFolder(FOLDERID_Documents) / L"FluentPresentMon").wstring());
+            options.AppDataDirectory = ToUtf8((KnownFolder(FOLDERID_LocalAppData) / L"FluentPresentMon").wstring());
         }
         const auto executableDirectory = ExecutableDirectory();
         options.InstallDirectory = ToUtf8((Lowercase(ToUtf8(executableDirectory.filename().wstring())) == "ui"

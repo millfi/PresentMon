@@ -11,10 +11,10 @@
 
 namespace p2c::win
 {
-	constexpr const wchar_t* UiProcessMutexPrefix = L"Local\\IntelPresentMon.";
+	constexpr const wchar_t* UiProcessMutexPrefix = L"Local\\FluentPresentMon.";
 	constexpr const char* DefaultUiProcessMutexSuffix = "UiBrowserProcess";
-	constexpr const wchar_t* UiWindowTitle = L"Intel PresentMon";
-	constexpr const wchar_t* UiWindowMutexSuffixProperty = L"IntelPresentMon.UiMutexSuffixAtom";
+	constexpr const wchar_t* UiWindowTitle = L"Fluent PresentMon";
+	constexpr const wchar_t* UiWindowMutexSuffixProperty = L"FluentPresentMon.UiMutexSuffixAtom";
 	constexpr int UiAlreadyRunningExitCode = 2;
 
 	inline std::wstring MakeUiProcessMutexName(std::string_view suffix)

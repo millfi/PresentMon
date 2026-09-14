@@ -13,7 +13,7 @@
 #include "../CommonUtilities/log/GlobalPolicy.h"
 #include "../CommonUtilities/log/IdentificationTable.h"
 
-TCHAR serviceName[MaxBufferLength] = TEXT("Intel PresentMon Service");
+TCHAR serviceName[MaxBufferLength] = TEXT("FluentPresentMonService");
 using namespace pmon;
 
 // common entry point whether invoked as service or as app

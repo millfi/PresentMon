@@ -17,6 +17,9 @@ param(
     [string]$ApiDll,
 
     [Parameter(ParameterSetName = 'Run')]
+    [switch]$UseInstalledService,
+
+    [Parameter(ParameterSetName = 'Run')]
     [string]$ReportDirectory,
 
     [Parameter(ParameterSetName = 'Run')]
@@ -129,7 +132,9 @@ if (Test-Path -LiteralPath $reportPath) {
 }
 
 $notBeforeUtc = [DateTime]::UtcNow
-& $resolvedHost $resolvedPresenter $resolvedKernel $resolvedApiDll $reportPath $dataDirectory $runId $TimeoutSeconds
+$hostArguments = @($resolvedPresenter, $resolvedKernel, $resolvedApiDll, $reportPath, $dataDirectory, $runId, $TimeoutSeconds)
+if ($UseInstalledService) { $hostArguments += '--installed-service' }
+& $resolvedHost @hostArguments
 if ($LASTEXITCODE -ne 0) {
     throw "Native overlay smoke host exited with code $LASTEXITCODE."
 }

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="Intel PresentMon ETW Provider" Language="1033" Version="1.0.0"
+           Manufacturer="Intel Corporation" UpgradeCode="1EE15DAC-9BC3-45D4-91FA-8F56163FCD28">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer PresentMon ETW Provider is installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="IntelFolder" Name="Intel">
+          <Directory Id="PresentMonProviderRoot" Name="PresentMon ETW Provider">
+            <Directory Id="provider_folder" Name="Provider" />
+          </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+    <Feature Id="Provider" Title="Intel PresentMon ETW Provider" Level="1">
+      <ComponentGroupRef Id="provider_group" />
+    </Feature>
+  </Product>
+</Wix>

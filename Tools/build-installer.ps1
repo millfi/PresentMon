@@ -1,11 +1,15 @@
 [CmdletBinding()]
 param(
     [switch]$UnsignedRelease,
+    [ValidateSet('None', 'Msix', 'Msi')][string]$EtwRegistration = 'None',
+    [string]$SccdPath,
+    [string]$WixBin,
+    [switch]$DisableUiAccess,
     [switch]$SkipRestore,
     [switch]$RunNativeTests,
     [string]$VisualStudioPath,
     [string]$VcpkgRoot = $env:VCPKG_ROOT,
-    [string]$Publisher = 'CN=PresentMon',
+    [string]$Publisher = 'CN=Fluent PresentMon',
     [string]$CertificateThumbprint,
     [string]$CertificateStore = 'My',
     [switch]$MachineCertificateStore,
@@ -21,6 +25,11 @@ if (-not $UnsignedRelease -and -not $CertificateThumbprint) {
     throw 'Pass -CertificateThumbprint and the matching -Publisher for a signed MSIX, or -UnsignedRelease for a validation-only package.'
 }
 if ($UnsignedRelease -and $CertificateThumbprint) { throw 'UnsignedRelease and CertificateThumbprint are mutually exclusive.' }
+if (-not $UnsignedRelease -and $EtwRegistration -eq 'Msix') {
+    . (Join-Path $repoRoot 'IntelPresentMon\PMInstaller\Sccd.ps1')
+    Assert-MsixSigningSccd -SccdPath $SccdPath -Publisher $Publisher -CertificateThumbprint $CertificateThumbprint `
+        -CertificateStore $CertificateStore -MachineCertificateStore:$MachineCertificateStore
+}
 if (-not $VisualStudioPath) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     $VisualStudioPath = & $vswhere -latest -products * -version '[18.7,)' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
@@ -55,6 +64,7 @@ try {
         Invoke-MsixTool $msbuild (@($project) + $nativeArguments)
     }
     & (Join-Path $repoRoot 'IntelPresentMon\PMInstaller\package-msix.ps1') -UnsignedRelease:$UnsignedRelease `
+        -EtwRegistration $EtwRegistration -SccdPath $SccdPath -WixBin $WixBin -DisableUiAccess:$DisableUiAccess `
         -Publisher $Publisher -CertificateThumbprint $CertificateThumbprint -CertificateStore $CertificateStore `
         -MachineCertificateStore:$MachineCertificateStore -TimestampUrl $TimestampUrl -WindowsSdkBin $WindowsSdkBin -VCLibsPackage $VCLibsPackage
 }

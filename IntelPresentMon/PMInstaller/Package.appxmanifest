@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
          xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:uap4="http://schemas.microsoft.com/appx/manifest/uap/windows10/4"
          xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
          xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
          xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+         xmlns:desktop7="http://schemas.microsoft.com/appx/manifest/desktop/windows10/7"
          xmlns:desktop8="http://schemas.microsoft.com/appx/manifest/desktop/windows10/8"
          xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-         IgnorableNamespaces="uap uap5 uap10 desktop6 desktop8 rescap">
-  <Identity Name="Intel.PresentMon" Publisher="CN=PresentMon" Version="0.0.0.0" ProcessorArchitecture="x64" />
+         IgnorableNamespaces="uap uap4 uap5 uap10 desktop6 desktop7 desktop8 rescap">
+  <Identity Name="Fluent.PresentMon" Publisher="CN=PresentMon" Version="0.0.0.0" ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>Intel PresentMon</DisplayName>
+    <DisplayName>Fluent PresentMon</DisplayName>
     <PublisherDisplayName>Intel Corporation</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
@@ -23,14 +25,14 @@
   </Dependencies>
   <Applications>
     <Application Id="PresentMon" Executable="PresentMon.exe" uap10:RuntimeBehavior="packagedClassicApp" uap10:TrustLevel="mediumIL" uap10:SupportsMultipleInstances="true">
-      <uap:VisualElements DisplayName="Intel PresentMon" Description="Capture and analyze graphics performance"
+      <uap:VisualElements DisplayName="Fluent PresentMon" Description="Capture and analyze graphics performance"
                           BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" />
       <Extensions>
         <desktop6:Extension Category="windows.service" Executable="PresentMonService.exe" EntryPoint="windows.fullTrustApplication">
-          <desktop6:Service Name="PresentMonSharedService" StartupType="auto" StartAccount="localSystem" />
+          <desktop6:Service Name="FluentPresentMonService" StartupType="auto" StartAccount="localSystem" />
         </desktop6:Extension>
         <uap5:Extension Category="windows.appExecutionAlias" Executable="PresentMon.exe" EntryPoint="windows.fullTrustApplication">
-          <uap5:AppExecutionAlias uap10:Subsystem="console"><uap5:ExecutionAlias Alias="presentmon-cli.exe" /></uap5:AppExecutionAlias>
+          <uap5:AppExecutionAlias uap10:Subsystem="console"><uap5:ExecutionAlias Alias="fluent-presentmon.exe" /></uap5:AppExecutionAlias>
         </uap5:Extension>
       </Extensions>
     </Application>
@@ -39,13 +41,13 @@
                           AppListEntry="none" BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" />
       <Extensions>
         <uap5:Extension Category="windows.appExecutionAlias" Executable="Console\PresentMon.exe" EntryPoint="windows.fullTrustApplication">
-          <uap5:AppExecutionAlias uap10:Subsystem="console"><uap5:ExecutionAlias Alias="presentmon-console.exe" /></uap5:AppExecutionAlias>
+          <uap5:AppExecutionAlias uap10:Subsystem="console"><uap5:ExecutionAlias Alias="fluent-presentmon-console.exe" /></uap5:AppExecutionAlias>
         </uap5:Extension>
       </Extensions>
     </Application>
   </Applications>
   <Extensions>
-    <desktop8:Extension Category="windows.eventTracing">
+    <desktop8:Extension Category="windows.eventTracing" desktop7:Scope="machine" desktop7:CompatMode="classic">
       <desktop8:EventTracing>
         <desktop8:Provider Id="00000000-0000-0000-0000-000000000000" Name="Intel-PresentMon"
                            ResourceFile="Provider\Intel-PresentMon.dll" MessageFile="Provider\Intel-PresentMon.dll" />
@@ -59,5 +61,7 @@
     <rescap:Capability Name="localSystemServices" />
     <rescap:Capability Name="unvirtualizedResources" />
     <rescap:Capability Name="uiAccess" />
+    <uap4:CustomCapability Name="Microsoft.classicAppCompat_8wekyb3d8bbwe" />
+    <uap4:CustomCapability Name="Microsoft.classicAppCompatElevated_8wekyb3d8bbwe" />
   </Capabilities>
 </Package>

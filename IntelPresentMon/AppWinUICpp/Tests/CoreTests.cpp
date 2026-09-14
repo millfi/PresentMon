@@ -314,6 +314,11 @@ namespace pmon::ui::tests
 
         void NativeLaunchArgumentsAreParsedAndUnsupportedArgumentsRejected()
         {
+            const auto defaults = services::StartupOptions::Parse({});
+            Expect(std::filesystem::path(defaults.DataDirectory).filename() == "FluentPresentMon"
+                && std::filesystem::path(defaults.AppDataDirectory).filename() == "FluentPresentMon"
+                && std::filesystem::path(ConfigurationStore::DefaultDataDirectory()).filename() == "FluentPresentMon",
+                "Default data paths must remain separate from upstream PresentMon.");
             const auto workingDirectory = std::filesystem::current_path().string();
             const auto options = services::StartupOptions::Parse({
                 "--p2c-act-name", "presentmon-test-pipe",

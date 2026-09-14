@@ -3,7 +3,7 @@
     x:Class="PresentMon.UI.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Intel PresentMon">
+    Title="Fluent PresentMon">
     <Grid x:Name="Root" RequestedTheme="Dark" Loaded="Root_Loaded">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -14,7 +14,7 @@
             <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0"
                         VerticalAlignment="Center">
                 <Image Source="Assets/AppIcon.png" Width="16" Height="16" />
-                <TextBlock Text="Intel PresentMon" VerticalAlignment="Center"
+                <TextBlock Text="Fluent PresentMon" VerticalAlignment="Center"
                            Style="{ThemeResource CaptionTextBlockStyle}" />
             </StackPanel>
         </Grid>

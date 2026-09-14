@@ -159,8 +159,8 @@ namespace p2c::infra::util
 	FolderResolver& FolderResolver::Get()
 	{
 		static FolderResolver res{
-			useDevMode ? L"" : L"Intel\\PresentMon",
-			useDevMode ? L"" : L"PresentMon"
+			useDevMode ? L"" : L"FluentPresentMon",
+			useDevMode ? L"" : L"FluentPresentMon"
 		};
 		return res;
 	}

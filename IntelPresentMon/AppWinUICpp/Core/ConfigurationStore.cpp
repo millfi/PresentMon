@@ -160,9 +160,9 @@ namespace pmon::ui::core
     std::string ConfigurationStore::DefaultDataDirectory()
     {
         if (const auto* profile = _wgetenv(L"USERPROFILE")) {
-            return ToUtf8((std::filesystem::path{ profile } / L"Documents" / L"PresentMon").wstring());
+            return ToUtf8((std::filesystem::path{ profile } / L"Documents" / L"FluentPresentMon").wstring());
         }
-        return ToUtf8((std::filesystem::temp_directory_path() / L"PresentMon").wstring());
+        return ToUtf8((std::filesystem::temp_directory_path() / L"FluentPresentMon").wstring());
     }
 
     void ConfigurationStore::AtomicWrite(const std::filesystem::path& path, const std::string& content)

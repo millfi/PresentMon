@@ -39,7 +39,7 @@ namespace pmon::ui::tests
         constexpr auto kOverlayAppearTimeout = 45s;
         constexpr auto kOverlayStableDuration = 5s;
         constexpr auto kUiInitializationDelay = 2s;
-        constexpr auto kUiIdentityProperty = L"IntelPresentMon.UiMutexSuffixAtom";
+        constexpr auto kUiIdentityProperty = L"FluentPresentMon.UiMutexSuffixAtom";
 
         struct SmokeReport
         {
@@ -105,6 +105,7 @@ namespace pmon::ui::tests
 
         void StopOwnedTraceSession(const std::wstring& name) noexcept
         {
+            if (name.empty()) return;
             struct Properties : EVENT_TRACE_PROPERTIES
             {
                 wchar_t LoggerName[1024];
@@ -144,7 +145,7 @@ namespace pmon::ui::tests
             ChildProcess(const ChildProcess&) = delete;
             ChildProcess& operator=(const ChildProcess&) = delete;
 
-            void Start(const std::wstring& command, const std::filesystem::path& workingDirectory, KillOnCloseJob& job)
+            void Start(const std::wstring& command, const std::filesystem::path& workingDirectory, KillOnCloseJob* job)
             {
                 std::vector<wchar_t> commandLine(command.begin(), command.end());
                 commandLine.push_back(L'\0');
@@ -160,7 +161,8 @@ namespace pmon::ui::tests
                 process_.Reset(process.hProcess);
                 thread_.Reset(process.hThread);
                 try {
-                    job.Attach(process_.Get());
+                    // Packaged processes already belong to a Windows-managed job.
+                    if (job) job->Attach(process_.Get());
                     if (ResumeThread(thread_.Get()) == (DWORD)-1) {
                         throw std::system_error((int)GetLastError(), std::system_category(), "Unable to resume overlay smoke process");
                     }
@@ -204,6 +206,10 @@ namespace pmon::ui::tests
 
             void Close() noexcept
             {
+                if (process_.Get() && WaitForSingleObject(process_.Get(), 0) == WAIT_TIMEOUT) {
+                    TerminateProcess(process_.Get(), 1);
+                    WaitForSingleObject(process_.Get(), 5000);
+                }
                 thread_.Reset();
                 process_.Reset();
             }
@@ -340,7 +346,7 @@ namespace pmon::ui::tests
             }
         }
 
-        void WaitForUiInitialization(const std::wstring& mutexName, const ChildProcess& kernel, std::stop_token deadline)
+        HWND WaitForUiInitialization(const std::wstring& mutexName, const ChildProcess& kernel, std::stop_token deadline)
         {
             while (true) {
                 ThrowIfTimedOut(deadline);
@@ -355,7 +361,7 @@ namespace pmon::ui::tests
                         // Root_Loaded starts the asynchronous session initialization after this identity appears.
                         // Give that initial empty-specification push a bounded interval to finish before testing.
                         SleepWithDeadline(std::chrono::duration_cast<std::chrono::milliseconds>(kUiInitializationDelay), deadline);
-                        return;
+                        return search.Window;
                     }
                 }
                 std::this_thread::sleep_for(50ms);
@@ -393,7 +399,7 @@ namespace pmon::ui::tests
 
         void Run(const std::filesystem::path& presenterExecutable, const std::filesystem::path& kernelExecutable,
             const std::filesystem::path& apiDll, const std::filesystem::path& dataDirectory,
-            const std::wstring& runId, DWORD timeoutMilliseconds)
+            const std::wstring& runId, DWORD timeoutMilliseconds, bool installedService)
         {
             const auto timeoutDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMilliseconds);
             std::stop_source deadlineSource;
@@ -427,26 +433,27 @@ namespace pmon::ui::tests
             std::filesystem::create_directories(logDirectory);
             std::filesystem::create_directories(serviceLogDirectory);
 
-            OverlaySmokeCleanup cleanup(etwSession);
+            OverlaySmokeCleanup cleanup(installedService ? L"" : etwSession);
             ChildProcess presenter;
             ChildProcess kernel;
-            presenter.Start(Quote(presenterExecutable) + L" /width=320 /height=240", presenterExecutable.parent_path(), cleanup.Job());
+            presenter.Start(Quote(presenterExecutable) + L" /width=320 /height=240", presenterExecutable.parent_path(), &cleanup.Job());
             SleepWithDeadline(500ms, deadline);
             if (!presenter.IsRunning()) throw std::runtime_error("PresentBench exited before overlay smoke started.");
 
-            const auto kernelCommand = Quote(kernelExecutable)
-                + L" --svc-as-child --control-pipe " + Quote(controlPipe)
+            const auto serviceArguments = installedService ? std::wstring{} :
+                L" --svc-as-child --control-pipe " + Quote(controlPipe)
                 + L" --shm-name-prefix " + Quote(sharedMemory)
                 + L" --etw-session-name " + Quote(etwSession)
+                + L" --svc-option log-dir " + Quote(serviceLogDirectory);
+            const auto kernelCommand = Quote(kernelExecutable) + serviceArguments
                 + L" --middleware-dll-path " + Quote(apiDll)
                 + L" --ui-mutex-name " + Quote(mutexName)
                 + L" --ui-data-directory " + Quote(dataDirectory)
-                + L" --svc-option log-dir " + Quote(serviceLogDirectory)
                 + L" --duplicate-ui-response no --files-working --log-level Debug --log-folder " + Quote(logDirectory.wstring());
-            kernel.Start(kernelCommand, kernelExecutable.parent_path(), cleanup.Job());
+            kernel.Start(kernelCommand, kernelExecutable.parent_path(), installedService ? nullptr : &cleanup.Job());
             const auto kernelPid = kernel.Id();
             const auto actionPipe = "ipm-cef-channel-" + std::to_string(kernelPid);
-            WaitForUiInitialization(mutexName, kernel, deadline);
+            const auto uiWindow = WaitForUiInitialization(mutexName, kernel, deadline);
 
             std::unique_ptr<interop::KernelClient> client;
             std::exception_ptr lastConnectError;
@@ -526,6 +533,9 @@ namespace pmon::ui::tests
             eventReader.request_stop();
             eventReader.join();
             client->Close();
+            PostMessageW(uiWindow, WM_CLOSE, 0, 0);
+            kernel.WaitForExit(10000);
+            if (kernel.ExitCode() != 0) throw std::runtime_error("Kernel did not shut down cleanly.");
             cleanup.Terminate();
             presenter.WaitForExit(5000);
             kernel.WaitForExit(5000);
@@ -535,8 +545,8 @@ namespace pmon::ui::tests
 
     int RunOverlaySmokeHost(int argc, wchar_t* argv[])
     {
-        if (argc != 8) {
-            std::wcerr << L"Usage: PresentMonUI.OverlaySmokeHost.exe <presenter-exe> <kernel-exe> <api-dll> <report> <data-directory> <run-id> <timeout-seconds>\n";
+        if (argc != 8 && argc != 9) {
+            std::wcerr << L"Usage: PresentMonUI.OverlaySmokeHost.exe <presenter-exe> <kernel-exe> <api-dll> <report> <data-directory> <run-id> <timeout-seconds> [--installed-service]\n";
             return 2;
         }
         SmokeReport report{ .RunId = argv[6] };
@@ -544,7 +554,8 @@ namespace pmon::ui::tests
         try {
             const auto timeoutSeconds = wcstoul(argv[7], nullptr, 10);
             if (!timeoutSeconds || timeoutSeconds > 180) throw std::invalid_argument("Timeout must be between one and 180 seconds.");
-            Run(argv[1], argv[2], argv[3], argv[5], report.RunId, (DWORD)(timeoutSeconds * 1000));
+            if (argc == 9 && std::wstring_view(argv[8]) != L"--installed-service") throw std::invalid_argument("Unknown overlay smoke option.");
+            Run(argv[1], argv[2], argv[3], argv[5], report.RunId, (DWORD)(timeoutSeconds * 1000), argc == 9);
             report.Steps = { "presenter-started", "kernel-connected", "basic-spec-pushed", "overlay-visible", "overlay-stable", "cleanup" };
             report.Complete = true;
         }

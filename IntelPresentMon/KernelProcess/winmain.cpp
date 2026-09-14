@@ -119,11 +119,11 @@ namespace kproc
 	ConcurrentUiInstanceAction ShowConcurrentUiInstanceDialog_()
 	{
 		const auto result = MessageBoxW(nullptr,
-			L"Intel PresentMon is already running; concurrent instances are not supported. "
+			L"Fluent PresentMon is already running; concurrent instances are not supported. "
 			L"Bring previous instance to the foreground?\n\n"
 			L"Select Yes to bring previous instance to the foreground.\n"
 			L"Select No to terminate it and launch a new one.",
-			L"Intel PresentMon",
+			L"Fluent PresentMon",
 			MB_YESNO | MB_DEFBUTTON2 | MB_ICONWARNING | MB_APPLMODAL | MB_SETFOREGROUND);
 		return result == IDYES ?
 			ConcurrentUiInstanceAction::BringToForeground :
@@ -149,12 +149,12 @@ namespace kproc
 				return 0;
 			}
 			if (response == p2c::cli::DuplicateUiResponse::No) {
-				pmlog_warn("Unable to close the previous Intel PresentMon instance");
+				pmlog_warn("Unable to close the previous Fluent PresentMon instance");
 				return p2c::win::UiAlreadyRunningExitCode;
 			}
 			MessageBoxW(nullptr,
-				L"Unable to close the previous Intel PresentMon instance.",
-				L"Intel PresentMon",
+				L"Unable to close the previous Fluent PresentMon instance.",
+				L"Fluent PresentMon",
 				MB_ICONERROR | MB_APPLMODAL | MB_SETFOREGROUND);
 			return p2c::win::UiAlreadyRunningExitCode;
 		}
@@ -370,7 +370,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 		// set the app id so that windows get grouped
 		// TODO: verify operation when multiple app instances running concurrently
-		SetCurrentProcessExplicitAppUserModelID(L"Intel.PresentMon");
+		SetCurrentProcessExplicitAppUserModelID(L"Fluent.PresentMon");
 
 		pmlog_info(std::format("== kernel process starting build#{} clean:{} ==",
 			bid::BuildIdShortHash(), !bid::BuildIdDirtyFlag()));

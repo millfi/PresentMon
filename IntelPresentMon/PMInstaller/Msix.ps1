@@ -13,6 +13,20 @@ function Read-MsixManifest {
     finally { $archive.Dispose() }
 }
 
+function Read-MsixDistribution {
+    param([Parameter(Mandatory)][string]$Path)
+    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        $entry = $archive.GetEntry('Distribution.json')
+        if (-not $entry) { throw "Missing Distribution.json: $Path" }
+        $reader = [IO.StreamReader]::new($entry.Open())
+        try { $distribution = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+        if ($distribution.EtwRegistration -notin @('None', 'Msix', 'Msi')) { throw 'Invalid ETW distribution mode.' }
+        return $distribution
+    }
+    finally { $archive.Dispose() }
+}
+
 function Invoke-MsixTool {
     param([string]$Executable, [string[]]$Arguments)
     & $Executable @Arguments

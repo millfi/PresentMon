@@ -1,7 +1,11 @@
 [CmdletBinding()]
 param(
     [switch]$UnsignedRelease,
-    [string]$Publisher = 'CN=PresentMon',
+    [ValidateSet('None', 'Msix', 'Msi')][string]$EtwRegistration = 'None',
+    [string]$SccdPath,
+    [string]$WixBin,
+    [switch]$DisableUiAccess,
+    [string]$Publisher = 'CN=Fluent PresentMon',
     [string]$CertificateThumbprint,
     [string]$CertificateStore = 'My',
     [switch]$MachineCertificateStore,
@@ -14,6 +18,12 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 if (-not $UnsignedRelease -and -not $CertificateThumbprint) { throw 'A signing certificate is required unless -UnsignedRelease is explicit.' }
 if ($UnsignedRelease -and $CertificateThumbprint) { throw 'UnsignedRelease and CertificateThumbprint are mutually exclusive.' }
+if ($SccdPath -and ($UnsignedRelease -or $EtwRegistration -ne 'Msix')) { throw 'SccdPath is only used by signed pure-MSIX builds.' }
+if (-not $UnsignedRelease -and $EtwRegistration -eq 'Msix') {
+    . (Join-Path $PSScriptRoot 'Sccd.ps1')
+    Assert-MsixSigningSccd -SccdPath $SccdPath -Publisher $Publisher -CertificateThumbprint $CertificateThumbprint `
+        -CertificateStore $CertificateStore -MachineCertificateStore:$MachineCertificateStore
+}
 if (-not $WindowsSdkBin) { $WindowsSdkBin = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin\10.0.26100.0\x64' }
 $makeappx = Join-Path $WindowsSdkBin 'makeappx.exe'
 $signtool = Join-Path $WindowsSdkBin 'signtool.exe'
@@ -37,7 +47,8 @@ function Copy-PayloadFile([string]$Source, [string]$RelativePath) {
     New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
     Copy-Item -LiteralPath $Source -Destination $destination
 }
-foreach ($name in @('PresentMon.exe', 'PresentMonService.exe', 'PresentMonAPI2.dll', 'ddETWExternal.xml')) {
+# The kernel imports the loader at process startup, before it can set DLL paths.
+foreach ($name in @('PresentMon.exe', 'PresentMonService.exe', 'PresentMonAPI2.dll', 'PresentMonAPI2Loader.dll', 'ddETWExternal.xml')) {
     Copy-PayloadFile (Join-Path $nativeRoot $name) $name
 }
 foreach ($directory in @('Shaders', 'Presets', 'Blocklists')) {
@@ -60,8 +71,10 @@ if (Test-Path -LiteralPath $uciRoot) {
 foreach ($name in @('LICENSE.txt', 'THIRD_PARTY.txt')) { Copy-PayloadFile (Join-Path $repoRoot $name) $name }
 foreach ($name in @('PresentMonAPI2Loader.dll', 'PresentMonAPI2Loader.lib')) { Copy-PayloadFile (Join-Path $nativeRoot $name) ('SDK\' + $name) }
 Copy-PayloadFile (Join-Path $repoRoot 'IntelPresentMon\PresentMonAPI2\PresentMonAPI.h') 'SDK\PresentMonAPI.h'
-Copy-PayloadFile (Join-Path $nativeRoot 'Intel-PresentMon.dll') 'Provider\Intel-PresentMon.dll'
-Copy-PayloadFile (Join-Path $repoRoot 'Provider\Intel-PresentMon.man') 'Provider\Intel-PresentMon.man'
+if ($EtwRegistration -eq 'Msix') {
+    Copy-PayloadFile (Join-Path $nativeRoot 'Intel-PresentMon.dll') 'Provider\Intel-PresentMon.dll'
+    Copy-PayloadFile (Join-Path $repoRoot 'Provider\Intel-PresentMon.man') 'Provider\Intel-PresentMon.man'
+}
 [xml]$versions = Get-Content -LiteralPath (Join-Path $repoRoot 'Version.props') -Raw
 $version = $versions.SelectSingleNode('//*[local-name()="PresentMonFileVersion"]').InnerText
 $consoleVersion = $versions.SelectSingleNode('//*[local-name()="PresentMonVersion"]').InnerText
@@ -92,10 +105,10 @@ Copy-PayloadFile (Join-Path $uiRoot 'Assets\AppIcon.png') 'Assets\AppIcon.png'
 Copy-Item -LiteralPath (Join-Path $uiRoot 'Assets\AppIcon.png') -Destination (Join-Path $resourceInput 'Assets')
 $makepri = Join-Path $WindowsSdkBin 'makepri.exe'
 Invoke-MsixTool $makepri @('new', '/pr', $resourceInput, '/cf', (Join-Path $PSScriptRoot 'priconfig.xml'),
-    '/in', 'Intel.PresentMon', '/of', (Join-Path $layout 'resources.pri'), '/o')
+    '/in', 'Fluent.PresentMon', '/of', (Join-Path $layout 'resources.pri'), '/o')
 Invoke-MsixTool $makepri @('dump', '/if', (Join-Path $layout 'resources.pri'), '/of', (Join-Path $output 'resources.xml'), '/dt', 'detailed', '/o')
 [xml]$resourceDump = Get-Content -LiteralPath (Join-Path $output 'resources.xml') -Raw
-if (-not $resourceDump.SelectSingleNode('//ResourceMap[@name="Intel.PresentMon"]//NamedResource[@name="MainWindow.xbf"]')) {
+if (-not $resourceDump.SelectSingleNode('//ResourceMap[@name="Fluent.PresentMon"]//NamedResource[@name="MainWindow.xbf"]')) {
     throw 'Packaged XAML resources were not indexed under the package identity.'
 }
 [xml]$manifest = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Package.appxmanifest') -Raw
@@ -106,15 +119,22 @@ $provider = $providerManifest.instrumentationManifest.instrumentation.events.pro
 $providerNode = $manifest.SelectSingleNode('//*[local-name()="Provider"]')
 $providerNode.SetAttribute('Id', ([guid]$provider.guid).ToString())
 $providerNode.SetAttribute('Name', $provider.name)
+if ($EtwRegistration -ne 'Msix') {
+    [void]$manifest.Package.RemoveChild($providerNode.ParentNode.ParentNode.ParentNode)
+    foreach ($capability in @($manifest.SelectNodes('//*[local-name()="CustomCapability"]'))) {
+        [void]$capability.ParentNode.RemoveChild($capability)
+    }
+}
+if ($SccdPath) { Copy-PayloadFile $SccdPath 'PresentMon.sccd' }
 $mt = Join-Path $WindowsSdkBin 'mt.exe'
 $kernel = Join-Path $layout 'PresentMon.exe'
 $kernelManifest = Join-Path $output 'kernel.manifest'
 Invoke-MsixTool $mt @('-nologo', "-inputresource:$kernel;#1", "-out:$kernelManifest")
 [xml]$kernelXml = Get-Content -LiteralPath $kernelManifest -Raw
-$kernelXml.SelectSingleNode('//*[local-name()="requestedExecutionLevel"]').SetAttribute('uiAccess', (-not $UnsignedRelease).ToString().ToLowerInvariant())
+$kernelXml.SelectSingleNode('//*[local-name()="requestedExecutionLevel"]').SetAttribute('uiAccess', (-not ($UnsignedRelease -or $DisableUiAccess)).ToString().ToLowerInvariant())
 $kernelXml.Save($kernelManifest)
 Invoke-MsixTool $mt @('-nologo', '-manifest', $kernelManifest, "-outputresource:$kernel;#1")
-if ($UnsignedRelease) {
+if ($UnsignedRelease -or $DisableUiAccess) {
     $capability = $manifest.SelectSingleNode('//*[local-name()="Capability" and @Name="uiAccess"]')
     [void]$capability.ParentNode.RemoveChild($capability)
 }
@@ -134,7 +154,8 @@ foreach ($frameworkPath in $frameworkPaths) {
     Copy-Item -LiteralPath $frameworkPath -Destination $dependencies
 }
 $manifest.Save((Join-Path $layout 'AppxManifest.xml'))
-$package = Join-Path $output "PresentMon_${version}_x64.msix"
+@{ EtwRegistration = $EtwRegistration } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $layout 'Distribution.json') -Encoding utf8
+$package = Join-Path $output "FluentPresentMon_${version}_x64.msix"
 $signArguments = @('sign', '/fd', 'SHA256', '/sha1', $CertificateThumbprint, '/s', $CertificateStore)
 if ($MachineCertificateStore) { $signArguments += '/sm' }
 if ($TimestampUrl) { $signArguments += @('/tr', $TimestampUrl, '/td', 'SHA256') }
@@ -144,17 +165,32 @@ if (-not $UnsignedRelease) {
     Invoke-MsixTool $signtool ($signArguments + @($package))
     Invoke-MsixTool $signtool @('verify', '/pa', $package)
 }
-foreach ($name in @('Install.ps1', 'Msix.ps1')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $output }
-& (Join-Path $repoRoot 'Tools\test-msix-package.ps1') -Package $package -DependencyDirectory $dependencies
-& (Join-Path $repoRoot 'Tools\test-msix-validator.ps1') -Package $package -DependencyDirectory $dependencies
+if ($EtwRegistration -eq 'Msi') {
+    & (Join-Path $PSScriptRoot 'package-etw-provider.ps1') -OutputDirectory $output -WixBin $WixBin
+    $providerMsi = Join-Path $output 'PresentMon_ETW_x64.msi'
+    if (-not $UnsignedRelease) {
+        Invoke-MsixTool $signtool ($signArguments + @($providerMsi))
+        Invoke-MsixTool $signtool @('verify', '/pa', $providerMsi)
+    }
+}
+foreach ($name in @('Install.ps1', 'Msix.ps1', 'README.md')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $output }
+& (Join-Path $repoRoot 'Tools\test-msix-package.ps1') -Package $package -DependencyDirectory $dependencies -EtwRegistration $EtwRegistration -RequireSccd:($EtwRegistration -eq 'Msix' -and -not $UnsignedRelease)
+& (Join-Path $repoRoot 'Tools\test-msix-validator.ps1') -Package $package -DependencyDirectory $dependencies -EtwRegistration $EtwRegistration
 $appBytes = Get-MsixPayloadBytes $package
 $frameworkBytes = [long]($frameworkPaths | ForEach-Object { Get-MsixPayloadBytes $_ } | Measure-Object -Sum).Sum
+$providerBytes = 0L
+if ($EtwRegistration -eq 'Msi') {
+    $providerBytes = (Get-Item -LiteralPath (Join-Path $nativeRoot 'Intel-PresentMon.dll')).Length +
+        (Get-Item -LiteralPath (Join-Path $repoRoot 'Provider\Intel-PresentMon.man')).Length
+}
 [ordered]@{
-    Package = $package; AppPayloadBytes = $appBytes; SharedFrameworkPayloadBytes = $frameworkBytes
-    WithFrameworksAlreadyInstalledBytes = $appBytes; FreshMachinePayloadBytes = $appBytes + $frameworkBytes
+    Package = $package; EtwRegistration = $EtwRegistration; AppPayloadBytes = $appBytes; SharedFrameworkPayloadBytes = $frameworkBytes
+    CompanionProviderPayloadBytes = $providerBytes
+    WithFrameworksAlreadyInstalledBytes = $appBytes + $providerBytes; FreshMachinePayloadBytes = $appBytes + $frameworkBytes + $providerBytes
     Note = 'Logical payload bytes; excludes filesystem allocation, metadata, servicing versions and cross-package file deduplication.'
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'size-report.json') -Encoding utf8
 $package | Set-Content -LiteralPath (Join-Path $repoRoot 'build\Release\MSIX\latest-package.txt') -Encoding utf8
+$package | Set-Content -LiteralPath (Join-Path $repoRoot "build\Release\MSIX\latest-$($EtwRegistration.ToLowerInvariant())-etw-package.txt") -Encoding utf8
 Write-Host "MSIX: $package"
 Write-Host "Offline distribution: $output (MSIX, Dependencies and Install.ps1)"
 Write-Host "App payload: $appBytes bytes; shared frameworks: $frameworkBytes bytes."

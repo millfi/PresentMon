@@ -78,7 +78,7 @@ if (((Get-Item -LiteralPath $root).Attributes -band [IO.FileAttributes]::Reparse
 $requiredFiles = @(
     'PresentMonUI.exe',
     'Microsoft.UI.Xaml.dll',
-    'resources.pri'
+    'PresentMonUI.pri'
 )
 foreach ($name in $requiredFiles) {
     $path = Join-Path $root $name

@@ -42,7 +42,8 @@ try {
     foreach ($name in $required) {
         [IO.File]::WriteAllBytes((Join-Path $payload $name), $binary)
     }
-    [IO.File]::WriteAllBytes((Join-Path $payload 'resources.pri'), [byte[]](1, 2, 3))
+    $priPath = Join-Path $payload 'PresentMonUI.pri'
+    [IO.File]::WriteAllBytes($priPath, [byte[]](1, 2, 3))
 
     foreach ($relative in @(
         'Assets\nested\icon.png', 'ja-JP\Microsoft.UI.Xaml.resources.dll',
@@ -60,6 +61,7 @@ try {
     $namespaces.AddNamespace('w', 'http://schemas.microsoft.com/wix/2006/wi')
     $files = $xml.SelectNodes('//w:File', $namespaces)
     Assert-True -Condition ($files.Count -eq 5) -Message "Expected 5 native runtime files, got $($files.Count)."
+    Assert-True -Condition ($null -ne $xml.SelectSingleNode('//w:File[@Name="PresentMonUI.pri"]', $namespaces)) -Message 'The native application PRI must be packaged.'
     $nestedFile = $xml.SelectSingleNode('//w:File[@Name="icon.png"]', $namespaces)
     Assert-True -Condition ($null -ne $nestedFile) -Message 'Nested content must be harvested.'
     Assert-True -Condition ($nestedFile.Source -eq '$(var.WinUIOutputDir)\Assets\nested\icon.png') -Message 'Payload source paths must be relative to the WiX output constant.'
@@ -70,6 +72,15 @@ try {
     & $harvestScript -OutputRoot $payload -WixFile $wixFile
     Assert-True -Condition ([IO.File]::ReadAllText($wixFile) -ceq $initialContent) -Message 'Harvest output must be deterministic.'
     Assert-True -Condition ((Get-Item -LiteralPath $wixFile).LastWriteTimeUtc -eq $initialTimestamp) -Message 'An unchanged harvest should preserve its timestamp.'
+
+    Remove-Item -LiteralPath $priPath -Force
+    [IO.File]::WriteAllBytes((Join-Path $payload 'resources.pri'), [byte[]](1, 2, 3))
+    Assert-Rejected -ExpectedMessage '*missing or empty:*PresentMonUI.pri*'
+    Remove-Item -LiteralPath (Join-Path $payload 'resources.pri') -Force
+    [IO.File]::WriteAllBytes($priPath, [byte[]]@())
+    Assert-Rejected -ExpectedMessage '*missing or empty:*PresentMonUI.pri*'
+    [IO.File]::WriteAllBytes($priPath, [byte[]](1, 2, 3))
+    Assert-True -Condition ([IO.File]::ReadAllText($wixFile) -ceq $initialContent) -Message 'A missing or empty PRI must leave the previous harvest untouched.'
 
     [IO.File]::WriteAllBytes((Join-Path $payload 'coreclr.dll'), $binary)
     Assert-Rejected -ExpectedMessage '*must not contain managed .NET runtime files:*coreclr.dll*'
